@@ -33,6 +33,19 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      "expo-image",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Fashion Agent to photograph your clothes for your digital closet."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Fashion Agent to access photos for your closet and style profile."
+        }
       ]
     ],
     "experiments": {
