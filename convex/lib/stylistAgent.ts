@@ -2,27 +2,23 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { Agent, createTool } from "@convex-dev/agent";
 import { z } from "zod";
 import { components, internal } from "../_generated/api";
+import { STYLIST_INSTRUCTIONS } from "./styleCanon";
 
 export const stylistAgent = new Agent(components.agent, {
   name: "Fashion Stylist",
   languageModel: anthropic("claude-sonnet-4-20250514"),
-  instructions: `You are an expert personal fashion stylist. You help users dress well using ONLY items from their actual wardrobe.
-
-Rules:
-- Never suggest items the user doesn't own
-- Respect their Style DNA profile and avoid list as hard constraints
-- Be specific about which pieces to combine and why
-- If the closet is too small for an occasion, say what's missing
-- Keep advice practical, confident, and warm`,
+  instructions: STYLIST_INSTRUCTIONS,
   tools: {
     searchWardrobe: createTool({
-      description: "Search the user's wardrobe by category, color, or season",
+      description:
+        "Search the wardrobe by category, color, season, or fit. Use this to check visual weight and proportion before composing a look.",
       inputSchema: z.object({
         category: z
           .enum(["top", "bottom", "dress", "outerwear", "shoes", "accessory", "bag", "other"])
           .optional(),
         color: z.string().optional(),
         season: z.string().optional(),
+        fit: z.string().optional(),
       }),
       execute: async (ctx, input): Promise<string> => {
         const results = await ctx.runQuery(internal.stylingInternal.searchWardrobeInternal, {
@@ -30,12 +26,14 @@ Rules:
           category: input.category,
           color: input.color,
           season: input.season,
+          fit: input.fit,
         });
         return JSON.stringify(results, null, 2);
       },
     }),
     createOutfit: createTool({
-      description: "Save a suggested outfit from specific wardrobe item IDs",
+      description:
+        "Save a composed look. rationale must be the silhouette-then-tension paragraph, not a caption.",
       inputSchema: z.object({
         itemIds: z.array(z.string()),
         occasion: z.string(),

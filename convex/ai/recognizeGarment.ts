@@ -29,24 +29,24 @@ export const garmentAttributesSchema = z.object({
 
 export type GarmentAttributes = z.infer<typeof garmentAttributesSchema>;
 
-const PROMPT = `Analyze this clothing or fashion item photo for a personal wardrobe app.
+const PROMPT = `Read this garment the way a stylist would: cut, cloth, color, visual weight.
 
 Return ONLY valid JSON with no markdown fences:
 
 {
   "category": "<one of: top, bottom, dress, outerwear, shoes, accessory, bag, other>",
-  "subcategory": "<specific item name, e.g. oversized wool blazer>",
-  "colors": ["<3-5 hex color codes of dominant colors>"],
-  "pattern": "<solid, striped, plaid, floral, graphic, etc.>",
-  "fit": "<slim, regular, oversized, relaxed, tailored, etc.>",
+  "subcategory": "<precise name a stylist would use: oversized washed black denim, dropped-shoulder merino knit, long wool coat — not 'jeans' or 'sweater'>",
+  "colors": ["<2-5 hex codes of the cloth itself, not the background. Prefer dusty/dirty readings over candy. Black is #1A1A1A not #000000 if it is washed.>"],
+  "pattern": "<what is actually on the cloth: solid, dirty wash, fine stripe, herringbone, graphic — be literal>",
+  "fit": "<where the volume sits: slim, regular, oversized, relaxed, tailored, boxy, dropped-shoulder, wide-leg, cropped>",
   "season": ["<spring, summer, fall, winter — one or more>"],
-  "occasions": ["<casual, work, formal, smart-casual, athletic, evening — one or more>"],
-  "material": "<fabric if identifiable, or omit>",
-  "brand": "<brand if visible, or omit>",
-  "confidence": <0.0-1.0 confidence in recognition>
+  "occasions": ["<casual, work, formal, smart-casual, athletic, evening — attitude this cloth can hold, not a costume label>"],
+  "material": "<fiber and hand if readable: merino, raw denim, washed cotton, leather, wool — omit if guessing>",
+  "brand": "<only if a label is visible>",
+  "confidence": <0.0-1.0>
 }
 
-Be specific and practical. If unsure about brand, omit it. Use hex colors when possible.`;
+Be specific. If unsure about brand, omit it.`;
 
 const FALLBACK: GarmentAttributes = {
   category: "other",

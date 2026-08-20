@@ -16,29 +16,34 @@ export const styleDnaSchema = z.object({
 
 export type StyleDnaResult = z.infer<typeof styleDnaSchema>;
 
-const PROMPT = `Analyze these fashion inspiration images together to build a personal style DNA profile.
+const PROMPT = `You are a fashion editor reading reference images to write a personal style brief.
+
+Look the way a good house looks: silhouette first, then proportion, texture, color temperature, attitude. Do not tag Pinterest aesthetics.
+
+Read across all images. Synthesize. Be specific enough that a stylist could dress this person tomorrow without seeing the photos.
 
 Return ONLY valid JSON with no markdown fences:
 
 {
-  "summary": "<2-3 sentence description of this person's style identity>",
-  "aesthetics": ["<style adjectives: minimal, streetwear, old money, avant-garde, etc.>"],
-  "palette": ["<3-8 hex color codes that define their palette>"],
+  "summary": "<2-3 sentences. Name the attitude (severe, easy, melancholic, precise). Name where the volume sits. Name the tension they repeat — e.g. oversized knit against a slim leg, raw denim against a clean shoe. Not 'versatile contemporary style.'>",
+  "aesthetics": ["<precise language: scandinavian contrast, quiet luxury, 90s reduction, washed tailoring — not generic 'minimal' or 'streetwear' unless that is truly the whole story>"],
+  "palette": ["<3-8 hex codes from the clothes, not the backgrounds. Prefer dusty, dirty, slightly off tones when that is what you see.>"],
   "colorTemperature": "<cool, neutral, or warm>",
-  "silhouettes": ["<preferred fits and shapes: oversized, tailored, relaxed, etc.>"],
-  "patterns": ["<patterns they gravitate toward: solid, stripes, etc.>"],
-  "avoid": ["<styles, colors, or items they likely avoid>"],
+  "silhouettes": ["<how volume is used, as phrases: dropped-shoulder coat over slim trouser, long hem, high-rise wide leg, close through the shoulder>"],
+  "patterns": ["<what actually appears: solid, dirty wash, fine stripe, no graphic — be literal>"],
+  "avoid": ["<what would break this eye: candy brights, skinny glossy, logo-forward, matching sets, dainty evening — only what the images argue against>"],
   "confidence": <0.0-1.0>
 }
 
-Synthesize across all images. Be specific and actionable for a personal stylist.`;
+Do not invent a house they are copying. Describe the eye they already have.`;
 
 const FALLBACK: StyleDnaResult = {
-  summary: "A versatile style with clean lines and neutral tones.",
-  aesthetics: ["minimal", "contemporary"],
-  palette: ["#1A1A1A", "#FAFAFA", "#FF6B6B"],
+  summary:
+    "A reduced wardrobe with clean lines and a neutral, slightly cool temperature. Volume is unresolved — infer from new pieces as they arrive.",
+  aesthetics: ["reduced contemporary", "neutral tailoring"],
+  palette: ["#1A1A1A", "#E8E4DC", "#6B6B6B"],
   colorTemperature: "neutral",
-  silhouettes: ["relaxed", "tailored"],
+  silhouettes: ["unresolved — wait for more references"],
   patterns: ["solid"],
   avoid: [],
   confidence: 0.3,
@@ -72,7 +77,7 @@ export async function extractStyleDna(imageUrls: string[]): Promise<StyleDnaResu
     const result = await model.generateContent([PROMPT, ...imageParts]);
     const text = result.response.text().trim();
     const cleaned = text.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
-    const parsed = JSON.parse(cleaned);
+    const parsed = JSON.parse(cleaned) as unknown;
     return styleDnaSchema.parse(parsed);
   } catch (err) {
     console.error("[extractStyleDna] failed:", err);

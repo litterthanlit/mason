@@ -68,9 +68,9 @@ export default function AgentScreen() {
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>Your AI Stylist</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>Stylist</Text>
             <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-              Ask what to wear, how to style an item, or get advice based on your closet.
+              What are you dressing for. Occasion, a piece you cannot place, or a look that feels unfinished.
             </Text>
           </View>
         }
@@ -94,7 +94,7 @@ export default function AgentScreen() {
       <View style={[styles.inputRow, { borderTopColor: colors.borderLight, backgroundColor: colors.background }]}>
         <TextInput
           style={[styles.input, { color: colors.text, backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-          placeholder="Ask your stylist..."
+          placeholder="What are you dressing for"
           placeholderTextColor={colors.textMuted}
           value={input}
           onChangeText={setInput}

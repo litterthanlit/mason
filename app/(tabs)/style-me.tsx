@@ -45,7 +45,7 @@ export default function StyleMeScreen() {
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
       <Text style={[styles.title, { color: colors.text }]}>Style Me</Text>
       <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-        Get outfit suggestions from your closet
+        Two looks from what you own. Silhouette first.
       </Text>
 
       <Text style={[styles.label, { color: colors.textSecondary }]}>Occasion</Text>
@@ -84,7 +84,7 @@ export default function StyleMeScreen() {
         {loading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.buttonText}>Generate Outfits</Text>
+          <Text style={styles.buttonText}>Compose looks</Text>
         )}
       </Pressable>
 
@@ -92,7 +92,7 @@ export default function StyleMeScreen() {
 
       {result ? (
         <View style={[styles.resultCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
-          <Text style={[styles.resultTitle, { color: colors.text }]}>Suggestions</Text>
+          <Text style={[styles.resultTitle, { color: colors.text }]}>Looks</Text>
           <Text style={[styles.resultBody, { color: colors.textSecondary }]}>{result}</Text>
         </View>
       ) : null}
