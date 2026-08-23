@@ -51,8 +51,8 @@ export default function HomeScreen() {
       ) : (
         <Link href="/onboarding/style-dna" asChild>
           <Pressable style={[styles.card, { backgroundColor: colors.tint }]}>
-            <Text style={styles.cardTitleLight}>Discover Your Style DNA</Text>
-            <Text style={styles.cardBodyLight}>Upload inspiration photos to build your profile</Text>
+            <Text style={[styles.cardTitleLight, { color: colors.onTint }]}>Discover Your Style DNA</Text>
+            <Text style={[styles.cardBodyLight, { color: colors.onTint }]}>Upload inspiration photos to build your profile</Text>
           </Pressable>
         </Link>
       )}
@@ -60,7 +60,7 @@ export default function HomeScreen() {
       <View style={styles.actions}>
         <Link href="/closet/add" asChild>
           <Pressable style={[styles.actionButton, { backgroundColor: colors.tint }]}>
-            <Text style={styles.actionButtonText}>Add to Closet</Text>
+            <Text style={[styles.actionButtonText, { color: colors.onTint }]}>Add to Closet</Text>
           </Pressable>
         </Link>
         <Link href="/style-me" asChild>
@@ -96,8 +96,8 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 18, fontWeight: "600" },
   cardBody: { fontSize: 14, lineHeight: 20 },
-  cardTitleLight: { fontSize: 18, fontWeight: "600", color: "#FFFFFF" },
-  cardBodyLight: { fontSize: 14, lineHeight: 20, color: "rgba(255,255,255,0.9)" },
+  cardTitleLight: { fontSize: 18, fontWeight: "600" },
+  cardBodyLight: { fontSize: 14, lineHeight: 20 },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   tag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   tagText: { fontSize: 12, fontWeight: "500" },
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
   },
-  actionButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
+  actionButtonText: { fontSize: 16, fontWeight: "600" },
   actionButtonOutline: {
     paddingVertical: 16,
     borderRadius: 12,

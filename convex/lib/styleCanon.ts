@@ -134,6 +134,17 @@ export function formatStylistContext(
 
 export const OUTFIT_REQUEST = `Compose 2 looks for this occasion using ONLY wardrobe items.
 
-For each look: a short name, pieces with [id] in wearing order, then one paragraph (silhouette, then the tension).
+Do not call tools. Reply with JSON only — no markdown, no preamble:
 
-If the closet cannot support this with dignity, give one missing garment — specific, not a list. Do not invent pieces.`;
+{
+  "looks": [
+    {
+      "name": "<two or three words, editorial, not Outfit 1>",
+      "itemIds": ["<exact wardrobe ids from the list, wearing order>"],
+      "rationale": "<one paragraph: silhouette, then the tension>"
+    }
+  ],
+  "missing": "<one specific missing garment, or null if the closet can dress this>"
+}
+
+Copy ids exactly. Do not invent pieces. Prefer two strong looks. If the closet cannot support this with dignity, return zero looks and one missing garment.`;

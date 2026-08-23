@@ -123,6 +123,7 @@ export const searchWardrobeInternal = internalQuery({
 export const createOutfitInternal = internalMutation({
   args: {
     userId: v.id("users"),
+    name: v.optional(v.string()),
     itemIds: v.array(v.id("wardrobeItems")),
     occasion: v.string(),
     weather: v.optional(v.string()),
@@ -133,6 +134,7 @@ export const createOutfitInternal = internalMutation({
     const now = Date.now();
     return await ctx.db.insert("outfits", {
       userId: args.userId,
+      name: args.name,
       itemIds: args.itemIds,
       occasion: args.occasion,
       weather: args.weather,
@@ -141,5 +143,44 @@ export const createOutfitInternal = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
+  },
+});
+
+export const hydratePiecesInternal = internalQuery({
+  args: {
+    userId: v.id("users"),
+    itemIds: v.array(v.string()),
+  },
+  returns: v.array(
+    v.object({
+      itemId: v.id("wardrobeItems"),
+      name: v.string(),
+      imageUrl: v.string(),
+      category: v.string(),
+    }),
+  ),
+  handler: async (ctx, { userId, itemIds }) => {
+    const seen = new Set<string>();
+    const result: {
+      itemId: Doc<"wardrobeItems">["_id"];
+      name: string;
+      imageUrl: string;
+      category: string;
+    }[] = [];
+
+    for (const raw of itemIds) {
+      const id = ctx.db.normalizeId("wardrobeItems", raw);
+      if (!id || seen.has(id)) continue;
+      const item = await ctx.db.get("wardrobeItems", id);
+      if (!item || item.userId !== userId) continue;
+      seen.add(id);
+      result.push({
+        itemId: item._id,
+        name: item.name,
+        imageUrl: item.imageUrl,
+        category: item.category,
+      });
+    }
+    return result;
   },
 });

@@ -12,6 +12,8 @@ import type * as ai_extractStyleDNA from "../ai/extractStyleDNA.js";
 import type * as ai_recognizeGarment from "../ai/recognizeGarment.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_customFunctions from "../lib/customFunctions.js";
+import type * as lib_looks from "../lib/looks.js";
+import type * as lib_styleCanon from "../lib/styleCanon.js";
 import type * as lib_stylistAgent from "../lib/stylistAgent.js";
 import type * as outfits from "../outfits.js";
 import type * as recognition from "../recognition.js";
@@ -35,6 +37,8 @@ declare const fullApi: ApiFromModules<{
   "ai/recognizeGarment": typeof ai_recognizeGarment;
   "lib/auth": typeof lib_auth;
   "lib/customFunctions": typeof lib_customFunctions;
+  "lib/looks": typeof lib_looks;
+  "lib/styleCanon": typeof lib_styleCanon;
   "lib/stylistAgent": typeof lib_stylistAgent;
   outfits: typeof outfits;
   recognition: typeof recognition;

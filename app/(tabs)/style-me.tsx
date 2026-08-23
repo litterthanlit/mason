@@ -1,4 +1,5 @@
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
+import { Link } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -9,92 +10,127 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@/convex/_generated/api";
 import Colors from "@/constants/Colors";
+import { Fonts } from "@/constants/Fonts";
 import { useColorScheme } from "@/components/useColorScheme";
+import { LookCard, type Look } from "@/components/LookCard";
 import { OCCASIONS } from "@/lib/types";
 
 export default function StyleMeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const insets = useSafeAreaInsets();
+  const items = useQuery(api.wardrobe.list, {});
   const generateOutfits = useAction(api.stylingAgent.generateOutfits);
 
   const [occasion, setOccasion] = useState("casual");
   const [weather, setWeather] = useState("");
-  const [result, setResult] = useState("");
+  const [looks, setLooks] = useState<Look[]>([]);
+  const [missing, setMissing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleGenerate() {
+  const emptyCloset = items !== undefined && items.length === 0;
+
+  async function handleCompose() {
+    if (emptyCloset || loading) return;
     setLoading(true);
     setError("");
+    setMissing(null);
     try {
-      const text = await generateOutfits({
+      const result = await generateOutfits({
         occasion,
-        weather: weather || undefined,
+        weather: weather.trim() || undefined,
       });
-      setResult(text);
+      setLooks(result.looks);
+      setMissing(result.missing);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate outfits");
+      setLooks([]);
+      setError(err instanceof Error ? err.message : "Could not compose looks.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
-      <Text style={[styles.title, { color: colors.text }]}>Style Me</Text>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 24 }]}
+    >
+      <Text style={[styles.kicker, { color: colors.textMuted }]}>Style</Text>
+      <Text style={[styles.title, { color: colors.text }]}>Looks</Text>
       <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-        Two looks from what you own. Silhouette first.
+        Two, from the closet. Silhouette first.
       </Text>
 
-      <Text style={[styles.label, { color: colors.textSecondary }]}>Occasion</Text>
-      <View style={styles.chips}>
-        {OCCASIONS.map((occ) => (
-          <Pressable key={occ} onPress={() => setOccasion(occ)}>
-            <Text
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: occasion === occ ? colors.tint : colors.backgroundSecondary,
-                  color: occasion === occ ? "#FFFFFF" : colors.text,
-                },
-              ]}
-            >
-              {occ}
-            </Text>
+      {emptyCloset ? (
+        <View style={styles.empty}>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            Photograph the closet first.
+          </Text>
+          <Link href="/closet/add" asChild>
+            <Pressable style={[styles.button, { backgroundColor: colors.tint }]}>
+              <Text style={[styles.buttonText, { color: colors.onTint }]}>Add a garment</Text>
+            </Pressable>
+          </Link>
+        </View>
+      ) : (
+        <>
+          <View style={styles.occasions}>
+            {OCCASIONS.map((occ) => {
+              const selected = occasion === occ;
+              return (
+                <Pressable key={occ} onPress={() => setOccasion(occ)} hitSlop={8}>
+                  <Text
+                    style={[
+                      styles.occasion,
+                      { color: selected ? colors.text : colors.textMuted },
+                      selected && { borderBottomColor: colors.text },
+                    ]}
+                  >
+                    {occ}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <TextInput
+            style={[styles.input, { borderBottomColor: colors.border, color: colors.text }]}
+            placeholder="Weather, if it matters"
+            placeholderTextColor={colors.textMuted}
+            value={weather}
+            onChangeText={setWeather}
+          />
+
+          <Pressable
+            style={[styles.button, { backgroundColor: colors.tint, opacity: loading ? 0.45 : 1 }]}
+            onPress={handleCompose}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.onTint} />
+            ) : (
+              <Text style={[styles.buttonText, { color: colors.onTint }]}>Compose</Text>
+            )}
           </Pressable>
-        ))}
-      </View>
-
-      <Text style={[styles.label, { color: colors.textSecondary }]}>Weather (optional)</Text>
-      <TextInput
-        style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.backgroundSecondary }]}
-        placeholder="e.g. rainy, cold, hot"
-        placeholderTextColor={colors.textMuted}
-        value={weather}
-        onChangeText={setWeather}
-      />
-
-      <Pressable
-        style={[styles.button, { backgroundColor: colors.tint, opacity: loading ? 0.6 : 1 }]}
-        onPress={handleGenerate}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.buttonText}>Compose looks</Text>
-        )}
-      </Pressable>
+        </>
+      )}
 
       {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
 
-      {result ? (
-        <View style={[styles.resultCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
-          <Text style={[styles.resultTitle, { color: colors.text }]}>Looks</Text>
-          <Text style={[styles.resultBody, { color: colors.textSecondary }]}>{result}</Text>
-        </View>
+      {looks.map((look) => (
+        <LookCard key={look.name} look={look} />
+      ))}
+
+      {missing && looks.length === 0 ? (
+        <Text style={[styles.missing, { color: colors.textSecondary }]}>{missing}</Text>
+      ) : null}
+
+      {missing && looks.length > 0 ? (
+        <Text style={[styles.note, { color: colors.textMuted }]}>{missing}</Text>
       ) : null}
     </ScrollView>
   );
@@ -102,23 +138,79 @@ export default function StyleMeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 20, gap: 12 },
-  title: { fontSize: 24, fontWeight: "700" },
-  subtitle: { fontSize: 15, marginTop: -4, marginBottom: 8 },
-  label: { fontSize: 13, fontWeight: "500", marginTop: 8 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, fontSize: 13, overflow: "hidden" },
-  input: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
+  content: { paddingHorizontal: 20, paddingBottom: 48, gap: 16 },
+  kicker: {
+    fontFamily: Fonts.sans,
+    fontSize: 11,
+    letterSpacing: 2.4,
+    textTransform: "uppercase",
   },
-  button: { paddingVertical: 16, borderRadius: 12, alignItems: "center", marginTop: 8 },
-  buttonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
-  error: { fontSize: 14 },
-  resultCard: { padding: 16, borderRadius: 12, borderWidth: 1, marginTop: 8 },
-  resultTitle: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
-  resultBody: { fontSize: 14, lineHeight: 22 },
+  title: {
+    fontFamily: Fonts.serif,
+    fontSize: 48,
+    lineHeight: 50,
+    letterSpacing: -1,
+    marginTop: -8,
+  },
+  subtitle: {
+    fontFamily: Fonts.sans,
+    fontSize: 16,
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  occasions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    rowGap: 12,
+  },
+  occasion: {
+    fontFamily: Fonts.sans,
+    fontSize: 13,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: "transparent",
+  },
+  input: {
+    fontFamily: Fonts.sans,
+    fontSize: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  button: {
+    marginTop: 8,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  buttonText: {
+    fontFamily: Fonts.sansMedium,
+    fontSize: 12,
+    letterSpacing: 2.2,
+    textTransform: "uppercase",
+  },
+  empty: { gap: 20, paddingTop: 12 },
+  emptyText: {
+    fontFamily: Fonts.serifItalic,
+    fontSize: 22,
+    lineHeight: 28,
+  },
+  error: {
+    fontFamily: Fonts.sans,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  missing: {
+    fontFamily: Fonts.serifItalic,
+    fontSize: 22,
+    lineHeight: 30,
+    marginTop: 12,
+  },
+  note: {
+    fontFamily: Fonts.sans,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 8,
+  },
 });

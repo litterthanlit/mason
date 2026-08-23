@@ -3,6 +3,7 @@ import { authedMutation, authedQuery } from "./lib/customFunctions";
 
 const outfitValidator = v.object({
   _id: v.id("outfits"),
+  name: v.optional(v.string()),
   itemIds: v.array(v.id("wardrobeItems")),
   occasion: v.string(),
   weather: v.optional(v.string()),

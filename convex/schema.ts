@@ -111,6 +111,7 @@ export default defineSchema({
 
   outfits: defineTable({
     userId: v.id("users"),
+    name: v.optional(v.string()),
     itemIds: v.array(v.id("wardrobeItems")),
     occasion: v.string(),
     weather: v.optional(v.string()),
