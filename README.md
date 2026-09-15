@@ -9,6 +9,8 @@ Native mobile AI stylist built with Expo, Convex, and Clerk.
 - **Style Me** — Occasion-based outfit suggestions from your closet
 - **AI Stylist** — Conversational chat grounded in your wardrobe and style profile
 
+Photoreal avatar / virtual try-on is **not shipped**. Direction, cost model, and the paste-a-link pipeline live in [`docs/TRY-ON.md`](docs/TRY-ON.md).
+
 ## Stack
 
 - Expo SDK 57 + Expo Router
