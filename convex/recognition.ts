@@ -1,13 +1,16 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
+import { rateLimiter } from "./lib/rateLimits";
+import { claimUpload, releaseUpload } from "./lib/uploads";
 import { garmentAttributes, garmentCategory, jobStatus, recognitionType } from "./lib/validators";
 
 export const generateUploadUrl = authedMutation({
   args: {},
   returns: v.string(),
   handler: async (ctx) => {
+    await rateLimiter.limit(ctx, "upload", { key: ctx.user._id, throws: true });
     return await ctx.storage.generateUploadUrl();
   },
 });
@@ -19,6 +22,9 @@ export const startRecognition = authedMutation({
   },
   returns: v.id("recognitionJobs"),
   handler: async (ctx, { storageId, type }) => {
+    await claimUpload(ctx, ctx.user._id, storageId);
+    await rateLimiter.limit(ctx, "recognizeGarment", { key: ctx.user._id, throws: true });
+
     const now = Date.now();
     const jobId = await ctx.db.insert("recognitionJobs", {
       userId: ctx.user._id,
@@ -89,10 +95,10 @@ export const confirmGarment = authedMutation({
   handler: async (ctx, { jobId, ...itemData }) => {
     const job = await ctx.db.get("recognitionJobs", jobId);
     if (!job || job.userId !== ctx.user._id || job.type !== "garment") {
-      throw new Error("Job not found");
+      throw new ConvexError("Job not found");
     }
     if (job.status !== "complete") {
-      throw new Error("Recognition is not finished");
+      throw new ConvexError("Recognition is not finished");
     }
     // Double-tapping Save must not create two closet items for one photo.
     if (job.wardrobeItemId) {
@@ -100,7 +106,7 @@ export const confirmGarment = authedMutation({
     }
 
     const imageUrl = await ctx.storage.getUrl(job.storageId);
-    if (!imageUrl) throw new Error("Image not found");
+    if (!imageUrl) throw new ConvexError("Image not found");
 
     const now = Date.now();
     const itemId = await ctx.db.insert("wardrobeItems", {
@@ -198,6 +204,32 @@ export const completeStyleDnaJob = internalMutation({
       styleDnaResult: result,
       updatedAt: Date.now(),
     });
+    return null;
+  },
+});
+
+const STALE_JOB_MS = 24 * 60 * 60 * 1000;
+
+/** Photos that were scanned but never saved to the closet: drop the job and the file. */
+export const cleanupStaleJobs = internalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const stale = await ctx.db
+      .query("recognitionJobs")
+      .withIndex("by_creation_time", (q) => q.lt("_creationTime", Date.now() - STALE_JOB_MS))
+      .take(200);
+
+    for (const job of stale) {
+      if (job.type === "garment" && !job.wardrobeItemId) {
+        await releaseUpload(ctx, job.storageId);
+      }
+      await ctx.db.delete("recognitionJobs", job._id);
+    }
+
+    if (stale.length === 200) {
+      await ctx.scheduler.runAfter(0, internal.recognition.cleanupStaleJobs, {});
+    }
     return null;
   },
 });

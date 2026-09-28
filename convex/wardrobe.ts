@@ -1,5 +1,6 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
+import { claimUpload, releaseUpload } from "./lib/uploads";
 import { garmentCategory } from "./lib/validators";
 
 const wardrobeItemValidator = v.object({
@@ -74,8 +75,9 @@ export const create = authedMutation({
   },
   returns: v.id("wardrobeItems"),
   handler: async (ctx, args) => {
+    await claimUpload(ctx, ctx.user._id, args.storageId);
     const imageUrl = await ctx.storage.getUrl(args.storageId);
-    if (!imageUrl) throw new Error("Image not found");
+    if (!imageUrl) throw new ConvexError("Image not found");
 
     const now = Date.now();
     return await ctx.db.insert("wardrobeItems", {
@@ -119,7 +121,7 @@ export const update = authedMutation({
   handler: async (ctx, { itemId, ...updates }) => {
     const item = await ctx.db.get("wardrobeItems", itemId);
     if (!item || item.userId !== ctx.user._id) {
-      throw new Error("Item not found");
+      throw new ConvexError("Item not found");
     }
 
     const patch: Record<string, unknown> = { updatedAt: Date.now() };
@@ -138,7 +140,7 @@ export const remove = authedMutation({
   handler: async (ctx, { itemId }) => {
     const item = await ctx.db.get("wardrobeItems", itemId);
     if (!item || item.userId !== ctx.user._id) {
-      throw new Error("Item not found");
+      throw new ConvexError("Item not found");
     }
 
     // Outfits keep raw ids; drop the piece so looks never point at a deleted garment.
@@ -157,7 +159,7 @@ export const remove = authedMutation({
     }
 
     await ctx.db.delete("wardrobeItems", itemId);
-    await ctx.storage.delete(item.storageId);
+    await releaseUpload(ctx, item.storageId);
     return null;
   },
 });

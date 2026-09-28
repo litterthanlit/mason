@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import { getThreadMetadata } from "@convex-dev/agent";
 import { components } from "../_generated/api";
 import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
@@ -13,6 +14,6 @@ export async function assertThreadOwner(
 ) {
   const thread = await getThreadMetadata(ctx, components.agent, { threadId }).catch(() => null);
   if (!thread || thread.userId !== userId) {
-    throw new Error("Thread not found");
+    throw new ConvexError("Thread not found");
   }
 }

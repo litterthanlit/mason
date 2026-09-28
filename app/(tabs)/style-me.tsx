@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@/convex/_generated/api";
+import { describeError } from "@/lib/errors";
 import Colors from "@/constants/Colors";
 import { Fonts } from "@/constants/Fonts";
 import { useColorScheme } from "@/components/useColorScheme";
@@ -48,7 +49,7 @@ export default function StyleMeScreen() {
       setMissing(result.missing);
     } catch (err) {
       setLooks([]);
-      setError(err instanceof Error ? err.message : "Could not compose looks.");
+      setError(describeError(err, "Could not compose looks."));
     } finally {
       setLoading(false);
     }

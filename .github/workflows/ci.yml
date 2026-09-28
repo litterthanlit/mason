@@ -19,3 +19,5 @@ jobs:
         run: npm run typecheck
       - name: Typecheck Convex functions
         run: npm run typecheck:convex
+      - name: Backend tests
+        run: npm test

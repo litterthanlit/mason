@@ -1,7 +1,9 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation } from "./_generated/server";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
+import { rateLimiter } from "./lib/rateLimits";
+import { claimUpload } from "./lib/uploads";
 
 // extractStyleDna only reads the first 10; reject more instead of silently dropping them.
 const MAX_REFERENCES = 10;
@@ -37,11 +39,15 @@ export const startExtraction = authedMutation({
   returns: v.null(),
   handler: async (ctx, { storageIds }) => {
     if (storageIds.length < 1) {
-      throw new Error("Add at least one inspiration photo");
+      throw new ConvexError("Add at least one inspiration photo");
     }
     if (storageIds.length > MAX_REFERENCES) {
-      throw new Error(`Use at most ${MAX_REFERENCES} inspiration photos`);
+      throw new ConvexError(`Use at most ${MAX_REFERENCES} inspiration photos`);
     }
+    for (const storageId of storageIds) {
+      await claimUpload(ctx, ctx.user._id, storageId);
+    }
+    await rateLimiter.limit(ctx, "extractStyleDna", { key: ctx.user._id, throws: true });
 
     await ctx.scheduler.runAfter(0, internal.styleProfileActions.extractProfile, {
       userId: ctx.user._id,

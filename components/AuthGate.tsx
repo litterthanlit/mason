@@ -4,6 +4,7 @@ import { Redirect, Stack } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { api } from "@/convex/_generated/api";
+import { describeError } from "@/lib/errors";
 import Colors from "@/constants/Colors";
 import { useColorScheme } from "@/components/useColorScheme";
 
@@ -24,7 +25,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     upsertUser()
       .then(() => setUserReady(true))
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : "Could not load your account");
+        setError(describeError(err, "Could not load your account"));
       });
   }, [upsertUser]);
 

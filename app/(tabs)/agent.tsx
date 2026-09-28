@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { api } from "@/convex/_generated/api";
+import { describeError } from "@/lib/errors";
 import Colors from "@/constants/Colors";
 import { useColorScheme } from "@/components/useColorScheme";
 
@@ -47,7 +48,7 @@ export default function AgentScreen() {
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: err instanceof Error ? err.message : "Something went wrong" },
+        { role: "assistant", content: describeError(err, "Something went wrong") },
       ]);
     } finally {
       setLoading(false);

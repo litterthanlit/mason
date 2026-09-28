@@ -6,6 +6,7 @@
     "@anthropic-ai/sdk": "^0.111.0",
     "@clerk/clerk-expo": "^2.19.31",
     "@convex-dev/agent": "^0.6.4",
+    "@convex-dev/rate-limiter": "^0.4.0",
     "@google/generative-ai": "^0.24.1",
     "convex": "^1.42.1",
     "convex-helpers": "^0.1.120",
@@ -38,10 +39,13 @@
   "devDependencies": {
     "@ai-sdk/anthropic": "^3.0.96",
     "@ai-sdk/provider-utils": "^4.0.38",
+    "@edge-runtime/vm": "^5.0.0",
     "@types/node": "^26.1.1",
     "@types/react": "~19.2.2",
     "ai": "^6.0.224",
-    "typescript": "~6.0.3"
+    "convex-test": "^0.0.60",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
   },
   "scripts": {
     "start": "expo start",
@@ -49,7 +53,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "typecheck:convex": "tsc --noEmit -p convex"
+    "typecheck:convex": "tsc --noEmit -p convex",
+    "test": "vitest run"
   },
   "private": true
 }

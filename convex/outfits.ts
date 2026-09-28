@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
 
 const outfitValidator = v.object({
@@ -39,7 +39,7 @@ export const create = authedMutation({
     for (const itemId of args.itemIds) {
       const item = await ctx.db.get("wardrobeItems", itemId);
       if (!item || item.userId !== ctx.user._id) {
-        throw new Error("Invalid wardrobe item");
+        throw new ConvexError("Invalid wardrobe item");
       }
     }
 
@@ -64,7 +64,7 @@ export const remove = authedMutation({
   handler: async (ctx, { outfitId }) => {
     const outfit = await ctx.db.get("outfits", outfitId);
     if (!outfit || outfit.userId !== ctx.user._id) {
-      throw new Error("Outfit not found");
+      throw new ConvexError("Outfit not found");
     }
     await ctx.db.delete("outfits", outfitId);
     return null;

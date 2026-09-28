@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { api } from "@/convex/_generated/api";
+import { describeError } from "@/lib/errors";
 import type { Id } from "@/convex/_generated/dataModel";
 import { AuthGate } from "@/components/AuthGate";
 import { CameraCapture } from "@/components/CameraCapture";
@@ -50,7 +51,7 @@ function StyleDnaScreen() {
       const storageId = await uploadImageToConvex(() => generateUploadUrl(), uri);
       setPhotos((prev) => [...prev, { uri, storageId }]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(describeError(err, "Upload failed"));
     } finally {
       setUploading(false);
     }
@@ -69,7 +70,7 @@ function StyleDnaScreen() {
       await startExtraction({ storageIds });
       router.replace("/(tabs)");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Extraction failed");
+      setError(describeError(err, "Extraction failed"));
     } finally {
       setExtracting(false);
     }

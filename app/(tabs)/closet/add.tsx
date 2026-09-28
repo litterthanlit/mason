@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { api } from "@/convex/_generated/api";
+import { describeError } from "@/lib/errors";
 import type { Id } from "@/convex/_generated/dataModel";
 import { CameraCapture } from "@/components/CameraCapture";
 import Colors from "@/constants/Colors";
@@ -77,7 +78,7 @@ export default function AddItemScreen() {
       const newJobId = await startRecognition({ storageId });
       setJobId(newJobId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(describeError(err, "Upload failed"));
       setStep("capture");
     }
   }
@@ -99,7 +100,7 @@ export default function AddItemScreen() {
       });
       router.back();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(describeError(err, "Save failed"));
     } finally {
       setSaving(false);
     }

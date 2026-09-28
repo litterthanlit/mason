@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getCurrentUserOrNull } from "./lib/auth";
 
@@ -33,7 +33,7 @@ export const upsertFromAuth = mutation({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Not authenticated");
+      throw new ConvexError("Not authenticated");
     }
 
     const existing = await ctx.db
@@ -71,14 +71,14 @@ export const completeOnboarding = mutation({
   returns: v.null(),
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    if (!identity) throw new ConvexError("Not authenticated");
 
     const user = await ctx.db
       .query("users")
       .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
       .unique();
 
-    if (!user) throw new Error("User not found");
+    if (!user) throw new ConvexError("User not found");
 
     await ctx.db.patch("users", user._id, {
       onboardingComplete: true,

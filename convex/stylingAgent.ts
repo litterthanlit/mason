@@ -1,11 +1,12 @@
 "use node";
 
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { GenericActionCtx } from "convex/server";
 import { internal } from "./_generated/api";
 import { action } from "./_generated/server";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { parseLooksPayload } from "./lib/looks";
+import { rateLimiter } from "./lib/rateLimits";
 import { assertThreadOwner } from "./lib/threads";
 import { stylistAgent } from "./lib/stylistAgent";
 import {
@@ -77,13 +78,14 @@ export const sendMessage = action({
   returns: v.string(),
   handler: async (ctx, { threadId, prompt, occasion, weather }): Promise<string> => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    if (!identity) throw new ConvexError("Not authenticated");
 
     const user = (await ctx.runQuery(internal.stylingInternal.getUserByToken, {
       tokenIdentifier: identity.tokenIdentifier,
     })) as { _id: Id<"users"> } | null;
-    if (!user) throw new Error("User not found");
+    if (!user) throw new ConvexError("User not found");
     await assertThreadOwner(ctx, threadId, user._id);
+    await rateLimiter.limit(ctx, "stylistMessage", { key: user._id, throws: true });
 
     const { context } = await loadStylistInputs(ctx, user._id);
     const occasionContext = occasion
@@ -107,12 +109,14 @@ export const generateOutfits = action({
   returns: generateLooksResultValidator,
   handler: async (ctx, { occasion, weather }): Promise<GenerateLooksResult> => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    if (!identity) throw new ConvexError("Not authenticated");
 
     const user = (await ctx.runQuery(internal.stylingInternal.getUserByToken, {
       tokenIdentifier: identity.tokenIdentifier,
     })) as { _id: Id<"users"> } | null;
-    if (!user) throw new Error("User not found");
+    if (!user) throw new ConvexError("User not found");
+
+    await rateLimiter.limit(ctx, "composeLooks", { key: user._id, throws: true });
 
     const { inventory, context } = await loadStylistInputs(ctx, user._id);
     if (inventory.length === 0) {
@@ -131,7 +135,7 @@ export const generateOutfits = action({
     try {
       payload = parseLooksPayload(result.text);
     } catch {
-      throw new Error("The stylist could not compose from this closet.");
+      throw new ConvexError("The stylist could not compose from this closet.");
     }
     const looks: ComposedLook[] = [];
 

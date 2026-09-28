@@ -40,6 +40,13 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_and_category", ["userId", "category"]),
 
+  // Who uploaded each file; claimed on first use (see lib/uploads.ts).
+  uploads: defineTable({
+    storageId: v.id("_storage"),
+    userId: v.id("users"),
+    createdAt: timestamp,
+  }).index("by_storage", ["storageId"]),
+
   recognitionJobs: defineTable({
     userId: v.id("users"),
     storageId: v.id("_storage"),
