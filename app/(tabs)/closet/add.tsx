@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -41,20 +41,18 @@ export default function AddItemScreen() {
 
   const job = useQuery(api.recognition.getJob, jobId ? { jobId } : "skip");
 
-  useEffect(() => {
-    if (step !== "processing" || !job) return;
-
+  // Seed the form once when the scan finishes (state adjusted during render,
+  // not in an effect, so there is no extra commit with stale fields).
+  if (step === "processing" && job) {
     if (job.status === "complete" && job.result) {
       const { confidence: _confidence, ...attributes } = job.result;
       setDraft({ ...attributes, name: attributes.subcategory });
       setStep("review");
-    }
-
-    if (job.status === "failed") {
+    } else if (job.status === "failed") {
       setError(job.error ?? "Could not read this garment. Try another photo.");
       setStep("capture");
     }
-  }, [step, job]);
+  }
 
   async function handleCapture(uri: string) {
     setPreviewUri(uri);

@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
-import agent from "@convex-dev/agent/test";
-import rateLimiter from "@convex-dev/rate-limiter/test";
+import { register as registerAgent } from "@convex-dev/agent/test";
+import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -10,8 +10,8 @@ export const modules = import.meta.glob("./**/*.*s");
 
 export function setup() {
   const t = convexTest(schema, modules);
-  agent.register(t);
-  rateLimiter.register(t);
+  registerAgent(t);
+  registerRateLimiter(t);
   return t;
 }
 

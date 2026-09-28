@@ -1,8 +1,15 @@
 import { Agent, createTool } from "@convex-dev/agent";
 import { z } from "zod";
 import { components, internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import { stylistModel } from "./models";
 import { STYLIST_INSTRUCTIONS } from "./styleCanon";
+
+// Every stylist thread is created with the owner's users._id (styling.createThread).
+function threadOwner(userId: string | undefined): Id<"users"> {
+  if (!userId) throw new Error("Stylist tools need a thread owner");
+  return userId as Id<"users">;
+}
 
 export const stylistAgent = new Agent(components.agent, {
   name: "Fashion Stylist",
@@ -22,7 +29,7 @@ export const stylistAgent = new Agent(components.agent, {
       }),
       execute: async (ctx, input): Promise<string> => {
         const results = await ctx.runQuery(internal.stylingInternal.searchWardrobeInternal, {
-          userId: ctx.userId as never,
+          userId: threadOwner(ctx.userId),
           category: input.category,
           color: input.color,
           season: input.season,
@@ -42,7 +49,7 @@ export const stylistAgent = new Agent(components.agent, {
       }),
       execute: async (ctx, input): Promise<string> => {
         const outfitId = await ctx.runMutation(internal.stylingInternal.createOutfitInternal, {
-          userId: ctx.userId as never,
+          userId: threadOwner(ctx.userId),
           itemIds: input.itemIds,
           occasion: input.occasion,
           weather: input.weather,

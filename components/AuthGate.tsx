@@ -13,29 +13,26 @@ import { useColorScheme } from "@/components/useColorScheme";
  * throws "User not found" before that, so rendering early crashes first launch.
  */
 export function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
   const upsertUser = useMutation(api.users.upsertFromAuth);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
-  const [userReady, setUserReady] = useState(false);
+  // Keyed by Clerk user so a sign-out/sign-in as someone else waits again.
+  const [syncedFor, setSyncedFor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const userReady = !!userId && syncedFor === userId;
 
-  const syncUser = useCallback(() => {
-    setError(null);
-    upsertUser()
-      .then(() => setUserReady(true))
-      .catch((err: unknown) => {
-        setError(describeError(err, "Could not load your account"));
-      });
-  }, [upsertUser]);
+  const syncUser = useCallback(
+    (forUser: string) =>
+      upsertUser()
+        .then(() => setSyncedFor(forUser))
+        .catch((err: unknown) => setError(describeError(err, "Could not load your account"))),
+    [upsertUser],
+  );
 
   useEffect(() => {
-    if (isSignedIn) {
-      syncUser();
-    } else {
-      setUserReady(false);
-    }
-  }, [isSignedIn, syncUser]);
+    if (isSignedIn && userId) void syncUser(userId);
+  }, [isSignedIn, userId, syncUser]);
 
   if (isLoaded && !isSignedIn) {
     return <Redirect href="/(auth)/sign-in" />;
@@ -49,7 +46,14 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         {error ? (
           <>
             <Text style={{ color: colors.error }}>{error}</Text>
-            <Pressable accessibilityRole="button" onPress={syncUser} hitSlop={8}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setError(null);
+                if (userId) void syncUser(userId);
+              }}
+              hitSlop={8}
+            >
               <Text style={{ color: colors.text, textDecorationLine: "underline" }}>Try again</Text>
             </Pressable>
           </>

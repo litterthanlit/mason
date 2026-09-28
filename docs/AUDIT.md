@@ -12,8 +12,8 @@ Legend: **Fixed** = changed on this branch. **Open** = recommended, not done yet
 |---|---|---|
 | S1 | **Thread IDOR.** `styling.listThreadMessages`, `styling.sendChatMessage` and `stylingAgent.sendMessage` took any `threadId` and only checked that the caller was signed in. Any user could read another user's stylist chat, or write into it and run the agent with their own closet as context. | **Fixed** — `convex/lib/threads.ts` `assertThreadOwner` checks the thread's `userId` on all three. |
 | S2 | **Agent could save outfits with any id.** The `createOutfit` tool passed model output to `createOutfitInternal` with `as never`, with no ownership check. A foreign or made-up id either crashed the validator or was stored. | **Fixed** — `createOutfitInternal` normalizes the ids, keeps only the user's own items, and rejects an empty result. |
-| S3 | **Storage ids are trusted.** `startRecognition`, `startExtraction` and `wardrobe.create` accept any `_storage` id. Ids are hard to guess, but nothing ties an upload to the uploader. | Open — record uploads in an `uploads` table (`storageId`, `userId`) from a mutation called after upload, and check it before use. |
-| S4 | **No rate limits on paid AI calls.** `generateOutfits`, `sendMessage`, `startRecognition`, `startExtraction` can be called in a loop and bill Gemini/Anthropic without limit. | Open — add `@convex-dev/rate-limiter` (per user, token bucket) around the four entry points. |
+| S3 | **Storage ids are trusted.** `startRecognition`, `startExtraction` and `wardrobe.create` accept any `_storage` id. Ids are hard to guess, but nothing ties an upload to the uploader. | **Fixed** — `lib/uploads.ts` claims a file for its first user, within an hour of upload. Anyone else gets "Image not found". |
+| S4 | **No rate limits on paid AI calls.** `generateOutfits`, `sendMessage`, `startRecognition`, `startExtraction` can be called in a loop and bill Gemini/Anthropic without limit. | **Fixed** — per-user token buckets in `lib/rateLimits.ts` on upload URLs, scans, Style DNA, looks and chat. |
 | S5 | `startExtraction` accepted unbounded `storageIds` (only the first 10 are ever read). | **Fixed** — capped at 10. |
 
 ## 2. Correctness bugs
@@ -28,21 +28,21 @@ Legend: **Fixed** = changed on this branch. **Open** = recommended, not done yet
 | B6 | **Double-tapping Save created duplicates.** `confirmGarment` ran again for the same job, and also ran for jobs that had not finished. | **Fixed** — it returns the existing item if one was saved, requires `status === "complete"` and `type === "garment"`. |
 | B7 | **Deleting an item left dangling data.** The image stayed in storage, and outfits kept the deleted id, so `LookCard` links pointed at "Item not found". | **Fixed** — `wardrobe.remove` deletes the file and removes the id from outfits (an outfit left with no items is deleted). |
 | B8 | A missing `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` rendered the app without providers, which crashed later inside `useQuery` with an unclear error. | **Fixed** — it now throws at startup with the variable's name, the same way `lib/convex.ts` does. |
-| B9 | Style DNA extraction runs in the background with no status. After "Analyze", the user lands on Home and still sees "Discover your Style DNA" until the job finishes, or forever if it failed. | Open — reuse the `recognitionJobs` pattern (a `styleDnaJobs` row with status) and show progress on Home. |
-| B10 | The stylist chat lives in component state. Every visit to the tab creates a new thread, and history is lost when the screen unmounts. `listThreadMessages` and `sendChatMessage` exist but nothing calls them. | Open — keep the user's latest thread (a `stylingSessions` row) and render with `useUIMessages` + streaming from `@convex-dev/agent/react`. |
-| B11 | Generated looks are thrown away when the user leaves the tab, although they are saved as `outfits`. No screen lists saved outfits. | Open — add a "Saved looks" list built on `outfits.list`. |
-| B12 | The review step on the add screen shows only name, category and subcategory. Colors, pattern, fit, season and occasions can't be corrected before saving. Item detail only allows renaming. | Open. |
+| B9 | Style DNA extraction runs in the background with no status. After "Analyze", the user lands on Home and still sees "Discover your Style DNA" until the job finishes, or forever if it failed. | **Fixed** — `styleDnaJobs` table. Home shows reading / failed / the profile. |
+| B10 | The stylist chat lives in component state. Every visit to the tab creates a new thread, and history is lost when the screen unmounts. `listThreadMessages` and `sendChatMessage` exist but nothing calls them. | **Fixed** — `styling.currentThread` resumes the latest thread. Replies stream through saved deltas and `useUIMessages`. |
+| B11 | Generated looks are thrown away when the user leaves the tab, although they are saved as `outfits`. No screen lists saved outfits. | **Fixed** — Looks lists saved outfits (`outfits.listLooks`), each with Remove. |
+| B12 | The review step on the add screen shows only name, category and subcategory. Colors, pattern, fit, season and occasions can't be corrected before saving. Item detail only allows renaming. | **Fixed** — `GarmentForm` edits every attribute, in both places. |
 
 ## 3. AI and model hygiene
 
 | # | Finding | Status |
 |---|---|---|
 | A1 | The stylist used `claude-sonnet-4-20250514`, which is **deprecated**. | **Fixed** — `claude-sonnet-5` (the current Sonnet, supported by the installed `@ai-sdk/anthropic`). |
-| A2 | Gemini `gemini-2.0-flash` is hard-coded in two places and is an older generation. | Open — check Google's current Flash model and move the id into one constant or an env var. |
-| A3 | `generateOutfits` asks for JSON in prose and parses it with a regex. | Open — use the agent's `generateObject` with `looksPayloadSchema` so the output is always valid. |
-| A4 | `generateOutfits` creates a new agent thread on every tap. Threads pile up and are never read. | Open — use a one-shot `generateObject` with no thread, or reuse one per session. |
-| A5 | The whole wardrobe and profile are added to *every* chat message, so each thread stores many copies and token cost grows with every turn. | Open — pass it as per-call system context, or add it once per thread. |
-| A6 | Gemini `mimeType` is cast from the response header with no check. | Open — the upload path always makes JPEGs, so default to `image/jpeg` when the header isn't a supported image type. |
+| A2 | Gemini `gemini-2.0-flash` is hard-coded in two places and is an older generation. | **Partly fixed** — every id lives in `lib/models.ts`. Setting `GEMINI_MODEL` in Convex moves to a newer Flash without a deploy. The default stays the same until someone confirms the current id. |
+| A3 | `generateOutfits` asks for JSON in prose and parses it with a regex. | **Fixed** — `generateText` with `Output.object` and the zod schema. |
+| A4 | `generateOutfits` creates a new agent thread on every tap. Threads pile up and are never read. | **Fixed** — a one-shot call with no thread. |
+| A5 | The whole wardrobe and profile are added to *every* chat message, so each thread stores many copies and token cost grows with every turn. | **Fixed** — sent as the per-call `system` prompt. |
+| A6 | Gemini `mimeType` is cast from the response header with no check. | **Fixed** — `geminiImageType` checks it. |
 
 ## 4. Data model and backend structure
 
@@ -50,45 +50,40 @@ Legend: **Fixed** = changed on this branch. **Open** = recommended, not done yet
 - **Fixed:** `getJobInternal` was an `internalMutation` used only for reading. It is now an `internalQuery`.
 - Open: `wardrobeItems.imageUrl` stores a URL at insert time. Save only `storageId` and resolve the URL on read, so it survives changes to the storage URL format.
 - Open: `recognitionJobs.styleDnaResult` and `completeStyleDnaJob.result` use `v.any()`. Use a real validator.
-- Open: `recognitionJobs` and unconfirmed uploads are never cleaned up. Add a daily cron that deletes jobs older than 24h that have no `wardrobeItemId`, together with their files.
-- Open: `stylingSessions` and `wardrobe.search` / `getInventorySummary` / `outfits.create` / `outfits.remove` / `users.completeOnboarding` are defined but unused. Wire them up or delete them.
+- **Fixed:** a daily cron (`convex/crons.ts`) deletes scans older than 24h that were never saved, along with their photos.
+- **Fixed:** `stylingSessions` and `outfits.remove` are now used. `wardrobe.search`, `getInventorySummary` and `users.completeOnboarding` are deleted.
 - Open: `.collect()` on the whole wardrobe is fine now. Past a few hundred items, paginate `wardrobe.list` and filter by category with the existing `by_user_and_category` index.
-- Open: the `as never` casts in `stylingAgent.ts` and `stylistAgent.ts` (the `userId` passes) hide type errors. Type `ctx.userId` as `Id<"users">` once, in one helper.
+- **Fixed:** the `as never` casts are gone. `threadOwner()` in `stylistAgent.ts` is the one checked conversion.
 
 ## 5. Frontend and design system
 
-- **Two visual languages.** `style-me.tsx` and `LookCard` use the editorial system (Instrument Serif + IBM Plex, uppercase tracking, hairlines, square buttons). Home, Closet, Add, Item, Sign-in, Style DNA and Chat still use starter-template styling (bold system font, 12px rounded pills). Open — pull `Kicker`, `Title`, `Button` (primary/outline) and `Chip` into `components/ui/` and move every screen onto them.
-- **Accessibility** (open, except sign-in and AuthGate, which are fixed):
-  - Most `Pressable`s have no `accessibilityRole="button"`, and chips have no `accessibilityState={{ selected }}`.
-  - Color swatches carry the only color information. Give each an `accessibilityLabel`, such as a readable color name.
-  - Garment images have no `accessibilityLabel` (use the item name).
-  - Loading states give screen readers nothing to announce. Add `accessibilityLiveRegion` or labels.
-  - Several touch targets, such as the occasion links and filter chips, are under 44×44pt. Add `hitSlop` or padding.
-- `add.tsx` and `style-dna.tsx` use RN `Image`. Use `expo-image` everywhere, as the rest of the app does, for caching.
-- `agent.tsx` uses `keyboardVerticalOffset={90}`, which is wrong on some devices. Use `useHeaderHeight()`.
-- `FlatList` keys use the array index in chat, the color value for swatches (duplicates collide) and `look.name` in Looks.
-- Leftover template files: `EditScreenInfo.tsx`, `StyledText.tsx`, `ExternalLink.tsx`, `Themed.tsx` (only `+not-found` uses it).
-- No sign-out control anywhere.
-- Onboarding is not enforced: `users.onboardingComplete` is stored but never read on the client.
+- **Fixed — two visual languages.** Home, Closet, Add, Item, Sign-in, Style DNA and Chat used starter-template styling. Every screen now builds from `components/ui/` (Kicker, Title, Body, Button, Chip, Field, Screen), in the editorial language that Looks had.
+- **Fixed — accessibility.** Roles, states, labels and live regions are built into the primitives. Swatches have spoken color names, images have labels, and touch targets are at least 44pt.
+- **Fixed:** every screen uses `expo-image`.
+- **Fixed:** chat uses `useHeaderHeight()` for the keyboard offset.
+- **Fixed:** list keys are now stable ids.
+- **Fixed:** the leftover template files are deleted.
+- **Fixed:** Home has a sign-out.
+- By design: onboarding isn't forced. Home offers Style DNA until it exists, and without it the stylist says it is inferring.
 
 ## 6. Tooling, config and release readiness
 
 - **Fixed:** there was no CI. `.github/workflows/ci.yml` now runs both typechecks (`typecheck`, new `typecheck:convex`).
-- Open: no tests. Start with `convex-test` + Vitest for the auth and ownership rules above (S1, S2, B6, B7), since a regression there is a data leak.
-- Open: no ESLint or Prettier. Add `eslint-config-expo` and `npx expo lint`.
+- **Fixed:** there were no tests. `convex-test` + Vitest now cover S1, S2, S3, S4, B6, B7, saved looks and DNA jobs (`npm test`, in CI).
+- **Fixed:** ESLint with `eslint-config-expo` (`npm run lint`, in CI). No Prettier yet.
 - Open: `app.json` has `name`/`slug`/`scheme` set to `"fashion"` and no `ios.bundleIdentifier` or `android.package`. EAS production builds and store submission need both.
-- Open: `@anthropic-ai/sdk`, `expo-camera` (only listed as a plugin), `expo-haptics`, `expo-file-system` and `expo-linking` are installed but never imported. Remove them or use them.
-- Open: `ai` and `@ai-sdk/*` are in `devDependencies` but run in production Convex functions. Move them to `dependencies`.
+- **Fixed:** removed `@anthropic-ai/sdk`, `expo-camera` and `expo-haptics`. `expo-file-system` and `expo-linking` stay because Expo and Expo Router depend on them.
+- **Fixed:** `ai` and `@ai-sdk/*` moved to `dependencies`. Both the Convex functions and the chat screen use them.
 - Open: there's no crash or error reporting (e.g. Sentry via `sentry-expo`) and no product analytics.
-- Open: README doesn't mention that Clerk needs the **Convex JWT template**, or that email verification is on.
+- **Fixed:** README now covers the Clerk `convex` JWT template, email-code verification, the checks, and the layout.
 
 ---
 
-## Suggested order for the open work
+## Still open
 
-1. Rate limits (S4) and upload ownership (S3). These cost money and privacy if skipped.
-2. `convex-test` coverage for the ownership rules on this branch.
-3. Chat persistence and streaming (B10), plus Style DNA status (B9). These are the two most visible UX gaps.
-4. Structured output for looks (A3/A4) and a single model config (A2).
-5. Shared `components/ui` primitives, with an accessibility pass as screens move onto them.
-6. Release config: bundle ids, lint, Sentry.
+1. **App identity.** `app.json` still uses `name`/`slug`/`scheme` `"fashion"` and has no `ios.bundleIdentifier` or `android.package`. They need the owner's reverse-domain id, and they are hard to change after a store release.
+2. **Crash reporting.** Add Sentry (`@sentry/react-native`) once there is a DSN.
+3. `wardrobeItems.imageUrl` is stored at insert time. Resolving it from `storageId` on read needs a small migration.
+4. `recognitionJobs.styleDnaResult` is `v.any()`, and the single-image `style_dna` recognition path is unused.
+5. Paginate `wardrobe.list` past a few hundred items.
+6. `convex/_generated/api.d.ts` was updated by hand, because no Convex deployment is available here. The first `npx convex dev` rewrites it, and the diff should be empty.

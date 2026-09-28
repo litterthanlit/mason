@@ -65,25 +65,3 @@ export const upsertFromAuth = mutation({
     });
   },
 });
-
-export const completeOnboarding = mutation({
-  args: {},
-  returns: v.null(),
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new ConvexError("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .unique();
-
-    if (!user) throw new ConvexError("User not found");
-
-    await ctx.db.patch("users", user._id, {
-      onboardingComplete: true,
-      updatedAt: Date.now(),
-    });
-    return null;
-  },
-});
