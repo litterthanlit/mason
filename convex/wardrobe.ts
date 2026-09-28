@@ -1,16 +1,6 @@
 import { v } from "convex/values";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
-
-const garmentCategory = v.union(
-  v.literal("top"),
-  v.literal("bottom"),
-  v.literal("dress"),
-  v.literal("outerwear"),
-  v.literal("shoes"),
-  v.literal("accessory"),
-  v.literal("bag"),
-  v.literal("other"),
-);
+import { garmentCategory } from "./lib/validators";
 
 const wardrobeItemValidator = v.object({
   _id: v.id("wardrobeItems"),
@@ -150,7 +140,24 @@ export const remove = authedMutation({
     if (!item || item.userId !== ctx.user._id) {
       throw new Error("Item not found");
     }
+
+    // Outfits keep raw ids; drop the piece so looks never point at a deleted garment.
+    const outfits = await ctx.db
+      .query("outfits")
+      .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
+      .collect();
+    for (const outfit of outfits) {
+      if (!outfit.itemIds.includes(itemId)) continue;
+      const remaining = outfit.itemIds.filter((id) => id !== itemId);
+      if (remaining.length === 0) {
+        await ctx.db.delete("outfits", outfit._id);
+      } else {
+        await ctx.db.patch("outfits", outfit._id, { itemIds: remaining, updatedAt: Date.now() });
+      }
+    }
+
     await ctx.db.delete("wardrobeItems", itemId);
+    await ctx.storage.delete(item.storageId);
     return null;
   },
 });

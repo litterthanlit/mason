@@ -104,7 +104,7 @@ export default function ItemDetailScreen() {
         style={[styles.button, { backgroundColor: colors.tint }]}
         onPress={() => (editing ? handleSave() : setEditing(true))}
       >
-        <Text style={styles.buttonText}>{editing ? "Save" : "Edit Name"}</Text>
+        <Text style={[styles.buttonText, { color: colors.onTint }]}>{editing ? "Save" : "Edit Name"}</Text>
       </Pressable>
 
       <Pressable style={[styles.deleteButton, { borderColor: colors.error }]} onPress={handleDelete}>
@@ -127,6 +127,6 @@ const styles = StyleSheet.create({
   swatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: "rgba(0,0,0,0.1)" },
   input: { borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 18 },
   button: { paddingVertical: 14, borderRadius: 10, alignItems: "center", marginTop: 8 },
-  buttonText: { color: "#FFFFFF", fontWeight: "600", fontSize: 16 },
+  buttonText: { fontWeight: "600", fontSize: 16 },
   deleteButton: { paddingVertical: 14, borderRadius: 10, alignItems: "center", borderWidth: 1, marginTop: 8 },
 });

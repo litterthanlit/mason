@@ -1,5 +1,5 @@
-import { useAuth, useSignIn, useSignUp } from "@clerk/clerk-expo";
-import { Link, useRouter } from "expo-router";
+import { isClerkAPIResponseError, useAuth, useSignIn, useSignUp } from "@clerk/clerk-expo";
+import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -27,10 +27,38 @@ export default function SignInScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Clerk requires email verification by default; sign-up is not complete until the code is entered.
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [code, setCode] = useState("");
 
-  if (isSignedIn) {
-    router.replace("/(tabs)");
-    return null;
+  if (isSignedIn && !pendingVerification) {
+    return <Redirect href="/(tabs)" />;
+  }
+
+  function describeError(err: unknown) {
+    if (isClerkAPIResponseError(err)) {
+      return err.errors[0]?.longMessage ?? err.errors[0]?.message ?? "Authentication failed";
+    }
+    return err instanceof Error ? err.message : "Authentication failed";
+  }
+
+  async function handleVerify() {
+    if (!signInLoaded || !signUpLoaded) return;
+    setLoading(true);
+    setError("");
+    try {
+      const result = await signUp.attemptEmailAddressVerification({ code: code.trim() });
+      if (result.status === "complete") {
+        await setActive({ session: result.createdSessionId });
+        router.replace("/onboarding/style-dna");
+      } else {
+        setError("That code did not finish sign-up. Try again.");
+      }
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSubmit() {
@@ -51,11 +79,12 @@ export default function SignInScreen() {
           await setActive({ session: result.createdSessionId });
           router.replace("/onboarding/style-dna");
         } else {
-          setError("Check your email to verify your account.");
+          await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+          setPendingVerification(true);
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Authentication failed");
+      setError(describeError(err));
     } finally {
       setLoading(false);
     }
@@ -73,43 +102,75 @@ export default function SignInScreen() {
         </Text>
 
         <View style={styles.form}>
-          <TextInput
-            style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.backgroundSecondary }]}
-            placeholder="Email"
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-          />
-          <TextInput
-            style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.backgroundSecondary }]}
-            placeholder="Password"
-            placeholderTextColor={colors.textMuted}
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
+          {pendingVerification ? (
+            <TextInput
+              style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.backgroundSecondary }]}
+              placeholder="Code from your email"
+              placeholderTextColor={colors.textMuted}
+              accessibilityLabel="Verification code"
+              keyboardType="number-pad"
+              textContentType="oneTimeCode"
+              autoComplete="one-time-code"
+              value={code}
+              onChangeText={setCode}
+            />
+          ) : (
+            <>
+              <TextInput
+                style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.backgroundSecondary }]}
+                placeholder="Email"
+                accessibilityLabel="Email"
+                textContentType="emailAddress"
+                autoComplete="email"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={email}
+                onChangeText={setEmail}
+              />
+              <TextInput
+                style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.backgroundSecondary }]}
+                placeholder="Password"
+                placeholderTextColor={colors.textMuted}
+                accessibilityLabel="Password"
+                textContentType={mode === "signIn" ? "password" : "newPassword"}
+                autoComplete={mode === "signIn" ? "password" : "new-password"}
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+              />
+            </>
+          )}
 
-          {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
+          {error ? (
+            <Text accessibilityLiveRegion="polite" style={[styles.error, { color: colors.error }]}>
+              {error}
+            </Text>
+          ) : null}
 
           <Pressable
             style={[styles.button, { backgroundColor: colors.tint }]}
-            onPress={handleSubmit}
+            onPress={pendingVerification ? handleVerify : handleSubmit}
             disabled={loading}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: loading, busy: loading }}
           >
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.onTint} />
             ) : (
-              <Text style={styles.buttonText}>{mode === "signIn" ? "Sign In" : "Create Account"}</Text>
+              <Text style={[styles.buttonText, { color: colors.onTint }]}>
+                {pendingVerification ? "Verify Email" : mode === "signIn" ? "Sign In" : "Create Account"}
+              </Text>
             )}
           </Pressable>
 
-          <Pressable onPress={() => setMode(mode === "signIn" ? "signUp" : "signIn")}>
-            <Text style={[styles.switchText, { color: colors.textSecondary }]}>
-              {mode === "signIn" ? "Need an account? Sign up" : "Already have an account? Sign in"}
-            </Text>
-          </Pressable>
+          {pendingVerification ? null : (
+            <Pressable accessibilityRole="button" onPress={() => setMode(mode === "signIn" ? "signUp" : "signIn")}>
+              <Text style={[styles.switchText, { color: colors.textSecondary }]}>
+                {mode === "signIn" ? "Need an account? Sign up" : "Already have an account? Sign in"}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -135,7 +196,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
   },
-  buttonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
+  buttonText: { fontSize: 16, fontWeight: "600" },
   switchText: { textAlign: "center", marginTop: 16, fontSize: 14 },
   error: { fontSize: 14 },
 });

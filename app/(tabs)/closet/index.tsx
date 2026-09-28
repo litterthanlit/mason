@@ -39,7 +39,7 @@ export default function ClosetScreen() {
                 ]}
                 onPress={() => setFilter(item)}
               >
-                <Text style={{ color: active ? "#FFFFFF" : colors.text, fontSize: 13, fontWeight: "500" }}>
+                <Text style={{ color: active ? colors.onTint : colors.text, fontSize: 13, fontWeight: "500" }}>
                   {label}
                 </Text>
               </Pressable>
@@ -48,7 +48,7 @@ export default function ClosetScreen() {
         />
         <Link href="/closet/add" asChild>
           <Pressable style={[styles.addButton, { backgroundColor: colors.tint }]}>
-            <Text style={styles.addButtonText}>+ Add</Text>
+            <Text style={[styles.addButtonText, { color: colors.onTint }]}>+ Add</Text>
           </Pressable>
         </Link>
       </View>
@@ -63,7 +63,7 @@ export default function ClosetScreen() {
           </Text>
           <Link href="/closet/add" asChild>
             <Pressable style={[styles.emptyButton, { backgroundColor: colors.tint }]}>
-              <Text style={styles.addButtonText}>Add Item</Text>
+              <Text style={[styles.addButtonText, { color: colors.onTint }]}>Add Item</Text>
             </Pressable>
           </Link>
         </View>
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
   },
-  addButtonText: { color: "#FFFFFF", fontWeight: "600", fontSize: 15 },
+  addButtonText: { fontWeight: "600", fontSize: 15 },
   grid: { padding: 12, gap: 12 },
   row: { gap: 12 },
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 8 },

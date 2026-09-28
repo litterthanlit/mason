@@ -80,7 +80,8 @@ export async function extractStyleDna(imageUrls: string[]): Promise<StyleDnaResu
     const parsed = JSON.parse(cleaned) as unknown;
     return styleDnaSchema.parse(parsed);
   } catch (err) {
+    // A placeholder profile would be saved as the user's real DNA; fail loudly instead.
     console.error("[extractStyleDna] failed:", err);
-    return FALLBACK;
+    throw new Error("Could not read these references. Try again.");
   }
 }

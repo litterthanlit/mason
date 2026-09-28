@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { components } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
 import { getCurrentUser } from "./lib/auth";
+import { assertThreadOwner } from "./lib/threads";
 import { stylistAgent } from "./lib/stylistAgent";
 
 export const createThread = mutation({
@@ -23,8 +24,8 @@ export const listThreadMessages = query({
     streamArgs: vStreamArgs,
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const user = await getCurrentUser(ctx);
+    await assertThreadOwner(ctx, args.threadId, user._id);
 
     const paginated = await listUIMessages(ctx, components.agent, args);
     const streams = await syncStreams(ctx, components.agent, args);
@@ -40,6 +41,7 @@ export const sendChatMessage = mutation({
   returns: v.null(),
   handler: async (ctx, { threadId, prompt }) => {
     const user = await getCurrentUser(ctx);
+    await assertThreadOwner(ctx, threadId, user._id);
     await saveMessage(ctx, components.agent, {
       threadId,
       userId: user._id,

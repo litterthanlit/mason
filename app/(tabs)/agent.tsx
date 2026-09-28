@@ -83,7 +83,7 @@ export default function AgentScreen() {
                 : [styles.assistantBubble, { backgroundColor: colors.backgroundSecondary }],
             ]}
           >
-            <Text style={{ color: item.role === "user" ? "#FFFFFF" : colors.text, lineHeight: 20 }}>
+            <Text style={{ color: item.role === "user" ? colors.onTint : colors.text, lineHeight: 20 }}>
               {item.content}
             </Text>
           </View>
@@ -105,7 +105,7 @@ export default function AgentScreen() {
           onPress={handleSend}
           disabled={!input.trim() || loading || !threadId}
         >
-          <Text style={styles.sendText}>Send</Text>
+          <Text style={[styles.sendText, { color: colors.onTint }]}>Send</Text>
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -138,5 +138,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   sendButton: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20 },
-  sendText: { color: "#FFFFFF", fontWeight: "600" },
+  sendText: { fontWeight: "600" },
 });

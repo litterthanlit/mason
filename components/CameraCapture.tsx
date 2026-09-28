@@ -69,7 +69,7 @@ export function CameraCapture({ onCapture, label = "Add Photo" }: Props) {
             style={[styles.button, { backgroundColor: colors.tint }]}
             onPress={() => pickImage(true)}
           >
-            <Text style={styles.buttonText}>Take Photo</Text>
+            <Text style={[styles.buttonText, { color: colors.onTint }]}>Take Photo</Text>
           </Pressable>
           <Pressable
             style={[styles.buttonOutline, { borderColor: colors.border }]}
@@ -97,7 +97,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonText: {
-    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
   },

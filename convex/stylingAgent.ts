@@ -6,6 +6,7 @@ import { internal } from "./_generated/api";
 import { action } from "./_generated/server";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { parseLooksPayload } from "./lib/looks";
+import { assertThreadOwner } from "./lib/threads";
 import { stylistAgent } from "./lib/stylistAgent";
 import {
   formatStylistContext,
@@ -82,6 +83,7 @@ export const sendMessage = action({
       tokenIdentifier: identity.tokenIdentifier,
     })) as { _id: Id<"users"> } | null;
     if (!user) throw new Error("User not found");
+    await assertThreadOwner(ctx, threadId, user._id);
 
     const { context } = await loadStylistInputs(ctx, user._id);
     const occasionContext = occasion

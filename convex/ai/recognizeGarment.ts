@@ -94,7 +94,8 @@ export async function recognizeGarment(imageUrl: string): Promise<GarmentAttribu
     const parsed = JSON.parse(cleaned);
     return garmentAttributesSchema.parse(parsed);
   } catch (err) {
+    // Fail the job instead of saving a fake "clothing item" the user never sees flagged.
     console.error("[recognizeGarment] failed:", err);
-    return FALLBACK;
+    throw new Error("Could not read this garment. Try another photo.");
   }
 }

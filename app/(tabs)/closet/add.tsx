@@ -146,7 +146,7 @@ export default function AddItemScreen() {
                 styles.chip,
                 {
                   backgroundColor: category === cat ? colors.tint : colors.backgroundSecondary,
-                  color: category === cat ? "#FFFFFF" : colors.text,
+                  color: category === cat ? colors.onTint : colors.text,
                 },
               ]}
             >
@@ -170,7 +170,7 @@ export default function AddItemScreen() {
         onPress={handleSave}
         disabled={saving}
       >
-        <Text style={styles.saveButtonText}>{saving ? "Saving..." : "Save to Closet"}</Text>
+        <Text style={[styles.saveButtonText, { color: colors.onTint }]}>{saving ? "Saving..." : "Save to Closet"}</Text>
       </Pressable>
     </ScrollView>
   );
@@ -204,6 +204,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
   },
-  saveButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
+  saveButtonText: { fontSize: 16, fontWeight: "600" },
   error: { textAlign: "center", marginTop: 12 },
 });

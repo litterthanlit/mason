@@ -1,36 +1,8 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
-
-const jobStatus = v.union(
-  v.literal("queued"),
-  v.literal("running"),
-  v.literal("complete"),
-  v.literal("failed"),
-);
-
-const garmentResult = v.object({
-  category: v.union(
-    v.literal("top"),
-    v.literal("bottom"),
-    v.literal("dress"),
-    v.literal("outerwear"),
-    v.literal("shoes"),
-    v.literal("accessory"),
-    v.literal("bag"),
-    v.literal("other"),
-  ),
-  subcategory: v.string(),
-  colors: v.array(v.string()),
-  pattern: v.string(),
-  fit: v.string(),
-  season: v.array(v.string()),
-  occasions: v.array(v.string()),
-  material: v.optional(v.string()),
-  brand: v.optional(v.string()),
-  confidence: v.number(),
-});
+import { garmentAttributes, garmentCategory, jobStatus, recognitionType } from "./lib/validators";
 
 export const generateUploadUrl = authedMutation({
   args: {},
@@ -43,7 +15,7 @@ export const generateUploadUrl = authedMutation({
 export const startRecognition = authedMutation({
   args: {
     storageId: v.id("_storage"),
-    type: v.optional(v.union(v.literal("garment"), v.literal("style_dna"))),
+    type: v.optional(recognitionType),
   },
   returns: v.id("recognitionJobs"),
   handler: async (ctx, { storageId, type }) => {
@@ -72,7 +44,7 @@ export const getJob = authedQuery({
       status: jobStatus,
       progress: v.optional(v.number()),
       currentStep: v.optional(v.string()),
-      result: v.optional(garmentResult),
+      result: v.optional(garmentAttributes),
       styleDnaResult: v.optional(v.any()),
       error: v.optional(v.string()),
       storageId: v.id("_storage"),
@@ -103,16 +75,7 @@ export const confirmGarment = authedMutation({
   args: {
     jobId: v.id("recognitionJobs"),
     name: v.string(),
-    category: v.union(
-      v.literal("top"),
-      v.literal("bottom"),
-      v.literal("dress"),
-      v.literal("outerwear"),
-      v.literal("shoes"),
-      v.literal("accessory"),
-      v.literal("bag"),
-      v.literal("other"),
-    ),
+    category: garmentCategory,
     subcategory: v.string(),
     colors: v.array(v.string()),
     pattern: v.string(),
@@ -125,8 +88,15 @@ export const confirmGarment = authedMutation({
   returns: v.id("wardrobeItems"),
   handler: async (ctx, { jobId, ...itemData }) => {
     const job = await ctx.db.get("recognitionJobs", jobId);
-    if (!job || job.userId !== ctx.user._id) {
+    if (!job || job.userId !== ctx.user._id || job.type !== "garment") {
       throw new Error("Job not found");
+    }
+    if (job.status !== "complete") {
+      throw new Error("Recognition is not finished");
+    }
+    // Double-tapping Save must not create two closet items for one photo.
+    if (job.wardrobeItemId) {
+      return job.wardrobeItemId;
     }
 
     const imageUrl = await ctx.storage.getUrl(job.storageId);
@@ -161,12 +131,12 @@ export const confirmGarment = authedMutation({
   },
 });
 
-export const getJobInternal = internalMutation({
+export const getJobInternal = internalQuery({
   args: { jobId: v.id("recognitionJobs") },
   returns: v.union(
     v.object({
       storageId: v.id("_storage"),
-      type: v.union(v.literal("garment"), v.literal("style_dna")),
+      type: recognitionType,
     }),
     v.null(),
   ),
@@ -199,7 +169,7 @@ export const updateJobStatus = internalMutation({
 export const completeGarmentJob = internalMutation({
   args: {
     jobId: v.id("recognitionJobs"),
-    result: garmentResult,
+    result: garmentAttributes,
   },
   returns: v.null(),
   handler: async (ctx, { jobId, result }) => {

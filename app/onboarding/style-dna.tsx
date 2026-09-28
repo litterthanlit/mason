@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { AuthGate } from "@/components/AuthGate";
 import { CameraCapture } from "@/components/CameraCapture";
 import Colors from "@/constants/Colors";
 import { useColorScheme } from "@/components/useColorScheme";
@@ -19,7 +20,16 @@ import { uploadImageToConvex } from "@/lib/upload";
 
 const MIN_PHOTOS = 3;
 
-export default function StyleDnaScreen() {
+// Sign-up lands here directly, outside (tabs), so it needs its own gate.
+export default function StyleDnaRoute() {
+  return (
+    <AuthGate>
+      <StyleDnaScreen />
+    </AuthGate>
+  );
+}
+
+function StyleDnaScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
@@ -78,7 +88,7 @@ export default function StyleDnaScreen() {
           ))}
         </View>
         <Pressable style={[styles.button, { backgroundColor: colors.tint }]} onPress={() => router.back()}>
-          <Text style={styles.buttonText}>Done</Text>
+          <Text style={[styles.buttonText, { color: colors.onTint }]}>Done</Text>
         </Pressable>
       </ScrollView>
     );
@@ -111,7 +121,7 @@ export default function StyleDnaScreen() {
           onPress={handleExtract}
           disabled={extracting}
         >
-          <Text style={styles.buttonText}>{extracting ? "Analyzing..." : "Analyze My Style"}</Text>
+          <Text style={[styles.buttonText, { color: colors.onTint }]}>{extracting ? "Analyzing..." : "Analyze My Style"}</Text>
         </Pressable>
       ) : null}
     </ScrollView>
@@ -129,6 +139,6 @@ const styles = StyleSheet.create({
   tags: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   tag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
   button: { paddingVertical: 16, borderRadius: 12, alignItems: "center" },
-  buttonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
+  buttonText: { fontSize: 16, fontWeight: "600" },
   error: { textAlign: "center" },
 });

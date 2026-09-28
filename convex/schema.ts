@@ -1,43 +1,8 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { garmentAttributes, garmentCategory, jobStatus, recognitionType } from "./lib/validators";
 
 const timestamp = v.number();
-
-const jobStatus = v.union(
-  v.literal("queued"),
-  v.literal("running"),
-  v.literal("complete"),
-  v.literal("failed"),
-);
-
-const recognitionType = v.union(
-  v.literal("garment"),
-  v.literal("style_dna"),
-);
-
-const garmentCategory = v.union(
-  v.literal("top"),
-  v.literal("bottom"),
-  v.literal("dress"),
-  v.literal("outerwear"),
-  v.literal("shoes"),
-  v.literal("accessory"),
-  v.literal("bag"),
-  v.literal("other"),
-);
-
-const garmentAttributes = v.object({
-  category: garmentCategory,
-  subcategory: v.string(),
-  colors: v.array(v.string()),
-  pattern: v.string(),
-  fit: v.string(),
-  season: v.array(v.string()),
-  occasions: v.array(v.string()),
-  material: v.optional(v.string()),
-  brand: v.optional(v.string()),
-  confidence: v.number(),
-});
 
 export default defineSchema({
   users: defineTable({

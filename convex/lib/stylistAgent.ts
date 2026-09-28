@@ -6,7 +6,7 @@ import { STYLIST_INSTRUCTIONS } from "./styleCanon";
 
 export const stylistAgent = new Agent(components.agent, {
   name: "Fashion Stylist",
-  languageModel: anthropic("claude-sonnet-4-20250514"),
+  languageModel: anthropic("claude-sonnet-5"),
   instructions: STYLIST_INSTRUCTIONS,
   tools: {
     searchWardrobe: createTool({
@@ -43,7 +43,7 @@ export const stylistAgent = new Agent(components.agent, {
       execute: async (ctx, input): Promise<string> => {
         const outfitId = await ctx.runMutation(internal.stylingInternal.createOutfitInternal, {
           userId: ctx.userId as never,
-          itemIds: input.itemIds as never,
+          itemIds: input.itemIds,
           occasion: input.occasion,
           weather: input.weather,
           rationale: input.rationale,

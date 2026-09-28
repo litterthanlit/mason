@@ -1,34 +1,62 @@
 import { useAuth } from "@clerk/clerk-expo";
 import { useMutation } from "convex/react";
 import { Redirect, Stack } from "expo-router";
-import { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { api } from "@/convex/_generated/api";
 import Colors from "@/constants/Colors";
 import { useColorScheme } from "@/components/useColorScheme";
 
+/**
+ * Children only mount once the Convex `users` row exists. Every authed query
+ * throws "User not found" before that, so rendering early crashes first launch.
+ */
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();
   const upsertUser = useMutation(api.users.upsertFromAuth);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const [userReady, setUserReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const syncUser = useCallback(() => {
+    setError(null);
+    upsertUser()
+      .then(() => setUserReady(true))
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Could not load your account");
+      });
+  }, [upsertUser]);
 
   useEffect(() => {
     if (isSignedIn) {
-      void upsertUser();
+      syncUser();
+    } else {
+      setUserReady(false);
     }
-  }, [isSignedIn, upsertUser]);
+  }, [isSignedIn, syncUser]);
 
-  if (!isLoaded) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background }}>
-        <ActivityIndicator color={colors.tint} />
-      </View>
-    );
+  if (isLoaded && !isSignedIn) {
+    return <Redirect href="/(auth)/sign-in" />;
   }
 
-  if (!isSignedIn) {
-    return <Redirect href="/(auth)/sign-in" />;
+  if (!isLoaded || !userReady) {
+    return (
+      <View
+        style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 16, backgroundColor: colors.background }}
+      >
+        {error ? (
+          <>
+            <Text style={{ color: colors.error }}>{error}</Text>
+            <Pressable accessibilityRole="button" onPress={syncUser} hitSlop={8}>
+              <Text style={{ color: colors.text, textDecorationLine: "underline" }}>Try again</Text>
+            </Pressable>
+          </>
+        ) : (
+          <ActivityIndicator color={colors.tint} accessibilityLabel="Loading your account" />
+        )}
+      </View>
+    );
   }
 
   return <>{children}</>;
