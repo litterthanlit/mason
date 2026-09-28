@@ -1,25 +1,19 @@
 import { useMutation, useQuery } from "convex/react";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "@/convex/_generated/api";
-import { describeError } from "@/lib/errors";
 import type { Id } from "@/convex/_generated/dataModel";
 import { AuthGate } from "@/components/AuthGate";
 import { CameraCapture } from "@/components/CameraCapture";
-import Colors from "@/constants/Colors";
-import { useColorScheme } from "@/components/useColorScheme";
+import { Body, Button, ErrorText, Kicker, Screen, Title, space, useTheme } from "@/components/ui";
+import { Fonts } from "@/constants/Fonts";
+import { describeError } from "@/lib/errors";
 import { uploadImageToConvex } from "@/lib/upload";
 
 const MIN_PHOTOS = 3;
+const MAX_PHOTOS = 10;
 
 // Sign-up lands here directly, outside (tabs), so it needs its own gate.
 export default function StyleDnaRoute() {
@@ -31,15 +25,15 @@ export default function StyleDnaRoute() {
 }
 
 function StyleDnaScreen() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme];
+  const colors = useTheme();
   const router = useRouter();
 
   const generateUploadUrl = useMutation(api.recognition.generateUploadUrl);
   const startExtraction = useMutation(api.styleProfile.startExtraction);
   const profile = useQuery(api.styleProfile.get);
 
-  const [photos, setPhotos] = useState<{ uri: string; storageId?: Id<"_storage"> }[]>([]);
+  const [photos, setPhotos] = useState<{ uri: string; storageId: Id<"_storage"> }[]>([]);
+  const [replacing, setReplacing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState("");
@@ -58,88 +52,105 @@ function StyleDnaScreen() {
   }
 
   async function handleExtract() {
-    const storageIds = photos.map((p) => p.storageId).filter(Boolean) as Id<"_storage">[];
-    if (storageIds.length < MIN_PHOTOS) {
-      setError(`Add at least ${MIN_PHOTOS} inspiration photos`);
-      return;
-    }
-
     setExtracting(true);
     setError("");
     try {
-      await startExtraction({ storageIds });
+      await startExtraction({ storageIds: photos.map((p) => p.storageId) });
+      // Home shows progress while the references are read.
       router.replace("/(tabs)");
     } catch (err) {
-      setError(describeError(err, "Extraction failed"));
-    } finally {
+      setError(describeError(err, "Could not start the analysis."));
       setExtracting(false);
     }
   }
 
-  if (profile) {
+  if (profile === undefined) {
     return (
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: colors.text }]}>Your Style DNA</Text>
-        <Text style={[styles.summary, { color: colors.textSecondary }]}>{profile.summary}</Text>
-        <View style={styles.tags}>
-          {profile.aesthetics.map((tag) => (
-            <View key={tag} style={[styles.tag, { backgroundColor: colors.backgroundSecondary }]}>
-              <Text style={{ color: colors.text }}>{tag}</Text>
-            </View>
-          ))}
-        </View>
-        <Pressable style={[styles.button, { backgroundColor: colors.tint }]} onPress={() => router.back()}>
-          <Text style={[styles.buttonText, { color: colors.onTint }]}>Done</Text>
-        </Pressable>
-      </ScrollView>
+      <View style={[styles.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator color={colors.tint} accessibilityLabel="Loading" />
+      </View>
     );
   }
 
-  return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
-      <Text style={[styles.title, { color: colors.text }]}>Build Your Style DNA</Text>
-      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-        Upload {MIN_PHOTOS}+ photos of looks you love — outfits, Pinterest saves, or your own style.
-      </Text>
+  if (profile && !replacing) {
+    return (
+      <Screen>
+        <Kicker>Style DNA</Kicker>
+        <Text style={[styles.summary, { color: colors.text }]}>{profile.summary}</Text>
+        <Body>{profile.aesthetics.join(" · ")}</Body>
+        {profile.avoid.length > 0 ? <Body tone="muted">Avoids {profile.avoid.join(", ")}.</Body> : null}
+        <Button label="Done" onPress={() => router.back()} />
+        <Button label="Replace with new references" variant="ghost" onPress={() => setReplacing(true)} />
+      </Screen>
+    );
+  }
 
-      <View style={styles.photoGrid}>
-        {photos.map((photo, i) => (
-          <Image key={i} source={{ uri: photo.uri }} style={styles.thumbnail} />
-        ))}
-      </View>
+  const canAdd = photos.length < MAX_PHOTOS;
+
+  return (
+    <Screen>
+      <Kicker>Style DNA</Kicker>
+      <Title size="md">Show the stylist your eye.</Title>
+      <Body>
+        {MIN_PHOTOS} to {MAX_PHOTOS} photos of clothes you love: outfits you have worn, saved looks, a
+        runway you keep returning to.
+      </Body>
+
+      {photos.length > 0 ? (
+        <View style={styles.grid}>
+          {photos.map((photo, i) => (
+            <View key={photo.storageId} style={styles.thumbWrap}>
+              <Image source={{ uri: photo.uri }} style={styles.thumb} contentFit="cover" accessibilityLabel={`Reference ${i + 1}`} />
+              <Pressable
+                onPress={() => setPhotos((prev) => prev.filter((p) => p.storageId !== photo.storageId))}
+                style={[styles.remove, { backgroundColor: colors.background }]}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove reference ${i + 1}`}
+              >
+                <Text style={[styles.removeText, { color: colors.text }]}>×</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       {uploading ? (
-        <ActivityIndicator color={colors.tint} />
+        <ActivityIndicator color={colors.tint} accessibilityLabel="Uploading photo" />
+      ) : canAdd ? (
+        <CameraCapture onCapture={handleAddPhoto} label={`${photos.length} of at least ${MIN_PHOTOS}`} />
       ) : (
-        <CameraCapture onCapture={handleAddPhoto} label={`${photos.length} photos added`} />
+        <Body tone="muted">That is the maximum. Remove one to swap it.</Body>
       )}
 
-      {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
+      {error ? <ErrorText>{error}</ErrorText> : null}
 
-      {photos.length >= MIN_PHOTOS ? (
-        <Pressable
-          style={[styles.button, { backgroundColor: colors.tint, opacity: extracting ? 0.6 : 1 }]}
-          onPress={handleExtract}
-          disabled={extracting}
-        >
-          <Text style={[styles.buttonText, { color: colors.onTint }]}>{extracting ? "Analyzing..." : "Analyze My Style"}</Text>
-        </Pressable>
-      ) : null}
-    </ScrollView>
+      <Button
+        label="Read my style"
+        onPress={handleExtract}
+        loading={extracting}
+        disabled={photos.length < MIN_PHOTOS || uploading}
+      />
+      {replacing ? <Button label="Keep my current DNA" variant="ghost" onPress={() => setReplacing(false)} /> : null}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 20, gap: 16 },
-  title: { fontSize: 24, fontWeight: "700" },
-  subtitle: { fontSize: 15, lineHeight: 22 },
-  summary: { fontSize: 15, lineHeight: 22 },
-  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  thumbnail: { width: 80, height: 100, borderRadius: 8 },
-  tags: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  tag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
-  button: { paddingVertical: 16, borderRadius: 12, alignItems: "center" },
-  buttonText: { fontSize: 16, fontWeight: "600" },
-  error: { textAlign: "center" },
+  centered: { flex: 1, alignItems: "center", justifyContent: "center" },
+  summary: { fontFamily: Fonts.serifItalic, fontSize: 24, lineHeight: 32 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  thumbWrap: { width: "31%" },
+  thumb: { width: "100%", aspectRatio: 3 / 4 },
+  remove: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  removeText: { fontSize: 18, lineHeight: 20 },
 });

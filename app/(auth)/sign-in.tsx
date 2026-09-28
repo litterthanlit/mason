@@ -1,26 +1,15 @@
 import { isClerkAPIResponseError, useAuth, useSignIn, useSignUp } from "@clerk/clerk-expo";
 import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import Colors from "@/constants/Colors";
-import { useColorScheme } from "@/components/useColorScheme";
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
+import { Body, Button, ErrorText, Field, Kicker, Title, space, useTheme } from "@/components/ui";
 
 export default function SignInScreen() {
   const { isSignedIn } = useAuth();
   const { signIn, setActive, isLoaded: signInLoaded } = useSignIn();
   const { signUp, isLoaded: signUpLoaded } = useSignUp();
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme];
+  const colors = useTheme();
 
   const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
   const [email, setEmail] = useState("");
@@ -96,18 +85,18 @@ export default function SignInScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.inner}>
-        <Text style={[styles.title, { color: colors.text }]}>Fashion Agent</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Your AI stylist. Recognize clothes, build your closet, get styled.
-        </Text>
+        <Kicker>Style Me</Kicker>
+        <Title size="md">{pendingVerification ? "Check your email." : "Dressed from what you own."}</Title>
+        <Body style={styles.subtitle}>
+          {pendingVerification
+            ? `We sent a code to ${email}.`
+            : "Photograph your closet. A stylist with a trained eye composes from it."}
+        </Body>
 
         <View style={styles.form}>
           {pendingVerification ? (
-            <TextInput
-              style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.backgroundSecondary }]}
-              placeholder="Code from your email"
-              placeholderTextColor={colors.textMuted}
-              accessibilityLabel="Verification code"
+            <Field
+              label="Verification code"
               keyboardType="number-pad"
               textContentType="oneTimeCode"
               autoComplete="one-time-code"
@@ -116,60 +105,40 @@ export default function SignInScreen() {
             />
           ) : (
             <>
-              <TextInput
-                style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.backgroundSecondary }]}
-                placeholder="Email"
-                accessibilityLabel="Email"
-                textContentType="emailAddress"
-                autoComplete="email"
-                placeholderTextColor={colors.textMuted}
+              <Field
+                label="Email"
                 autoCapitalize="none"
                 keyboardType="email-address"
+                textContentType="emailAddress"
+                autoComplete="email"
                 value={email}
                 onChangeText={setEmail}
               />
-              <TextInput
-                style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.backgroundSecondary }]}
-                placeholder="Password"
-                placeholderTextColor={colors.textMuted}
-                accessibilityLabel="Password"
+              <Field
+                label="Password"
+                secureTextEntry
                 textContentType={mode === "signIn" ? "password" : "newPassword"}
                 autoComplete={mode === "signIn" ? "password" : "new-password"}
-                secureTextEntry
                 value={password}
                 onChangeText={setPassword}
               />
             </>
           )}
 
-          {error ? (
-            <Text accessibilityLiveRegion="polite" style={[styles.error, { color: colors.error }]}>
-              {error}
-            </Text>
-          ) : null}
+          {error ? <ErrorText>{error}</ErrorText> : null}
 
-          <Pressable
-            style={[styles.button, { backgroundColor: colors.tint }]}
+          <Button
+            label={pendingVerification ? "Verify email" : mode === "signIn" ? "Sign in" : "Create account"}
             onPress={pendingVerification ? handleVerify : handleSubmit}
-            disabled={loading}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: loading, busy: loading }}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.onTint} />
-            ) : (
-              <Text style={[styles.buttonText, { color: colors.onTint }]}>
-                {pendingVerification ? "Verify Email" : mode === "signIn" ? "Sign In" : "Create Account"}
-              </Text>
-            )}
-          </Pressable>
+            loading={loading}
+          />
 
           {pendingVerification ? null : (
-            <Pressable accessibilityRole="button" onPress={() => setMode(mode === "signIn" ? "signUp" : "signIn")}>
-              <Text style={[styles.switchText, { color: colors.textSecondary }]}>
-                {mode === "signIn" ? "Need an account? Sign up" : "Already have an account? Sign in"}
-              </Text>
-            </Pressable>
+            <Button
+              variant="ghost"
+              label={mode === "signIn" ? "New here? Create an account" : "Have an account? Sign in"}
+              onPress={() => setMode(mode === "signIn" ? "signUp" : "signIn")}
+            />
           )}
         </View>
       </View>
@@ -179,24 +148,7 @@ export default function SignInScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  inner: { flex: 1, justifyContent: "center", padding: 24 },
-  title: { fontSize: 32, fontWeight: "700", marginBottom: 8 },
-  subtitle: { fontSize: 16, lineHeight: 24, marginBottom: 32 },
-  form: { gap: 12 },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-  },
-  button: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonText: { fontSize: 16, fontWeight: "600" },
-  switchText: { textAlign: "center", marginTop: 16, fontSize: 14 },
-  error: { fontSize: 14 },
+  inner: { flex: 1, justifyContent: "center", padding: space.xl, gap: space.sm },
+  subtitle: { marginBottom: space.xxl },
+  form: { gap: space.lg },
 });
