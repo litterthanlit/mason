@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { internalMutation } from "./_generated/server";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { rateLimiter } from "./lib/rateLimits";
+import { jobStatus } from "./lib/validators";
 import { claimUpload } from "./lib/uploads";
 
 // extractStyleDna only reads the first 10; reject more instead of silently dropping them.
@@ -49,10 +50,50 @@ export const startExtraction = authedMutation({
     }
     await rateLimiter.limit(ctx, "extractStyleDna", { key: ctx.user._id, throws: true });
 
+    const now = Date.now();
+    const jobId = await ctx.db.insert("styleDnaJobs", {
+      userId: ctx.user._id,
+      status: "running",
+      createdAt: now,
+      updatedAt: now,
+    });
     await ctx.scheduler.runAfter(0, internal.styleProfileActions.extractProfile, {
       userId: ctx.user._id,
+      jobId,
       storageIds,
     });
+    return null;
+  },
+});
+
+/** Latest extraction, so Home can say "reading" or "failed" instead of nothing. */
+export const latestJob = authedQuery({
+  args: {},
+  returns: v.union(
+    v.object({
+      _id: v.id("styleDnaJobs"),
+      status: jobStatus,
+      error: v.optional(v.string()),
+      createdAt: v.number(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx) => {
+    const job = await ctx.db
+      .query("styleDnaJobs")
+      .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
+      .order("desc")
+      .first();
+    if (!job) return null;
+    return { _id: job._id, status: job.status, error: job.error, createdAt: job.createdAt };
+  },
+});
+
+export const failJob = internalMutation({
+  args: { jobId: v.id("styleDnaJobs"), error: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { jobId, error }) => {
+    await ctx.db.patch("styleDnaJobs", jobId, { status: "failed", error, updatedAt: Date.now() });
     return null;
   },
 });
@@ -60,6 +101,7 @@ export const startExtraction = authedMutation({
 export const saveProfile = internalMutation({
   args: {
     userId: v.id("users"),
+    jobId: v.id("styleDnaJobs"),
     storageIds: v.array(v.id("_storage")),
     result: v.object({
       summary: v.string(),
@@ -73,7 +115,7 @@ export const saveProfile = internalMutation({
     }),
   },
   returns: v.null(),
-  handler: async (ctx, { userId, storageIds, result }) => {
+  handler: async (ctx, { userId, jobId, storageIds, result }) => {
     const existing = await ctx.db
       .query("styleProfiles")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -108,6 +150,7 @@ export const saveProfile = internalMutation({
       onboardingComplete: true,
       updatedAt: now,
     });
+    await ctx.db.patch("styleDnaJobs", jobId, { status: "complete", updatedAt: now });
 
     return null;
   },

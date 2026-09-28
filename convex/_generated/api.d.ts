@@ -14,6 +14,7 @@ import type * as crons from "../crons.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_customFunctions from "../lib/customFunctions.js";
 import type * as lib_looks from "../lib/looks.js";
+import type * as lib_models from "../lib/models.js";
 import type * as lib_rateLimits from "../lib/rateLimits.js";
 import type * as lib_styleCanon from "../lib/styleCanon.js";
 import type * as lib_stylistAgent from "../lib/stylistAgent.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/customFunctions": typeof lib_customFunctions;
   "lib/looks": typeof lib_looks;
+  "lib/models": typeof lib_models;
   "lib/rateLimits": typeof lib_rateLimits;
   "lib/styleCanon": typeof lib_styleCanon;
   "lib/stylistAgent": typeof lib_stylistAgent;

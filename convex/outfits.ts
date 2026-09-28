@@ -25,6 +25,58 @@ export const list = authedQuery({
   },
 });
 
+const lookValidator = v.object({
+  outfitId: v.id("outfits"),
+  name: v.string(),
+  rationale: v.string(),
+  occasion: v.string(),
+  weather: v.optional(v.string()),
+  createdAt: v.number(),
+  pieces: v.array(
+    v.object({
+      itemId: v.id("wardrobeItems"),
+      name: v.string(),
+      imageUrl: v.string(),
+      category: v.string(),
+    }),
+  ),
+});
+
+/** Recent looks with their garments, newest first. Looks whose pieces were all deleted are skipped. */
+export const listLooks = authedQuery({
+  args: { limit: v.optional(v.number()) },
+  returns: v.array(lookValidator),
+  handler: async (ctx, { limit }) => {
+    const outfits = await ctx.db
+      .query("outfits")
+      .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
+      .order("desc")
+      .take(Math.min(limit ?? 20, 50));
+
+    const looks = [];
+    for (const outfit of outfits) {
+      const pieces = [];
+      for (const itemId of outfit.itemIds) {
+        const item = await ctx.db.get("wardrobeItems", itemId);
+        if (item) {
+          pieces.push({ itemId: item._id, name: item.name, imageUrl: item.imageUrl, category: item.category });
+        }
+      }
+      if (pieces.length === 0) continue;
+      looks.push({
+        outfitId: outfit._id,
+        name: outfit.name ?? outfit.occasion,
+        rationale: outfit.rationale ?? "",
+        occasion: outfit.occasion,
+        weather: outfit.weather,
+        createdAt: outfit.createdAt,
+        pieces,
+      });
+    }
+    return looks;
+  },
+});
+
 export const create = authedMutation({
   args: {
     itemIds: v.array(v.id("wardrobeItems")),

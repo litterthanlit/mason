@@ -158,3 +158,35 @@ describe("stylist outfits", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("saved looks", () => {
+  test("looks keep their surviving pieces and drop when empty", async () => {
+    const t = setup();
+    const alice = await signIn(t, "alice");
+    const knit = await addItem(t, alice.as);
+    const trouser = await addItem(t, alice.as);
+    await alice.as.mutation(api.outfits.create, { itemIds: [knit.itemId], occasion: "casual" });
+    await alice.as.mutation(api.outfits.create, {
+      itemIds: [knit.itemId, trouser.itemId],
+      occasion: "work",
+    });
+
+    await alice.as.mutation(api.wardrobe.remove, { itemId: knit.itemId });
+
+    const looks = await alice.as.query(api.outfits.listLooks, {});
+    expect(looks).toHaveLength(1);
+    expect(looks[0].pieces.map((p) => p.itemId)).toEqual([trouser.itemId]);
+  });
+});
+
+describe("style DNA", () => {
+  test("starting extraction records a running job", async () => {
+    const t = setup();
+    const alice = await signIn(t, "alice");
+    const storageIds = [await storeImage(t), await storeImage(t), await storeImage(t)];
+    await alice.as.mutation(api.styleProfile.startExtraction, { storageIds });
+
+    const job = await alice.as.query(api.styleProfile.latestJob, {});
+    expect(job?.status).toBe("running");
+  });
+});

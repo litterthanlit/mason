@@ -81,6 +81,15 @@ export default defineSchema({
     updatedAt: timestamp,
   }).index("by_user", ["userId"]),
 
+  // One row per "Analyze" tap, so the app can show progress and failures.
+  styleDnaJobs: defineTable({
+    userId: v.id("users"),
+    status: jobStatus,
+    error: v.optional(v.string()),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }).index("by_user", ["userId"]),
+
   outfits: defineTable({
     userId: v.id("users"),
     name: v.optional(v.string()),

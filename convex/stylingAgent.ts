@@ -1,17 +1,19 @@
 "use node";
 
+import { generateText, Output } from "ai";
 import { ConvexError, v } from "convex/values";
 import type { GenericActionCtx } from "convex/server";
 import { internal } from "./_generated/api";
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import type { DataModel, Id } from "./_generated/dataModel";
-import { parseLooksPayload } from "./lib/looks";
+import { looksPayloadSchema } from "./lib/looks";
+import { stylistModel } from "./lib/models";
 import { rateLimiter } from "./lib/rateLimits";
-import { assertThreadOwner } from "./lib/threads";
 import { stylistAgent } from "./lib/stylistAgent";
 import {
   formatStylistContext,
   OUTFIT_REQUEST,
+  STYLIST_INSTRUCTIONS,
   type ProfileForStylist,
   type WardrobeItemForStylist,
 } from "./lib/styleCanon";
@@ -24,6 +26,7 @@ type LookPiece = {
 };
 
 type ComposedLook = {
+  outfitId: Id<"outfits">;
   name: string;
   rationale: string;
   pieces: LookPiece[];
@@ -42,6 +45,7 @@ const lookPieceValidator = v.object({
 });
 
 const lookValidator = v.object({
+  outfitId: v.id("outfits"),
   name: v.string(),
   rationale: v.string(),
   pieces: v.array(lookPieceValidator),
@@ -54,50 +58,40 @@ const generateLooksResultValidator = v.object({
 
 async function loadStylistInputs(
   ctx: GenericActionCtx<DataModel>,
-  userId: string,
-): Promise<{ inventory: WardrobeItemForStylist[]; context: string }> {
+  userId: Id<"users">,
+): Promise<{ inventory: WardrobeItemForStylist[]; system: string }> {
   const [inventory, profile] = await Promise.all([
-    ctx.runQuery(internal.stylingInternal.getInventoryInternal, { userId: userId as never }),
-    ctx.runQuery(internal.stylingInternal.getProfileInternal, { userId: userId as never }),
+    ctx.runQuery(internal.stylingInternal.getInventoryInternal, { userId }),
+    ctx.runQuery(internal.stylingInternal.getProfileInternal, { userId }),
   ]);
 
   const items = inventory as WardrobeItemForStylist[];
+  // Closet and DNA ride in the system prompt, so they are not copied into
+  // thread history on every turn.
   return {
     inventory: items,
-    context: formatStylistContext(profile as ProfileForStylist | null, items),
+    system: `${STYLIST_INSTRUCTIONS}\n\n${formatStylistContext(profile as ProfileForStylist | null, items)}`,
   };
 }
 
-export const sendMessage = action({
+/** Scheduled by styling.sendChatMessage; streams the reply into the thread. */
+export const respond = internalAction({
   args: {
     threadId: v.string(),
-    prompt: v.string(),
-    occasion: v.optional(v.string()),
-    weather: v.optional(v.string()),
+    userId: v.id("users"),
+    promptMessageId: v.string(),
   },
-  returns: v.string(),
-  handler: async (ctx, { threadId, prompt, occasion, weather }): Promise<string> => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new ConvexError("Not authenticated");
-
-    const user = (await ctx.runQuery(internal.stylingInternal.getUserByToken, {
-      tokenIdentifier: identity.tokenIdentifier,
-    })) as { _id: Id<"users"> } | null;
-    if (!user) throw new ConvexError("User not found");
-    await assertThreadOwner(ctx, threadId, user._id);
-    await rateLimiter.limit(ctx, "stylistMessage", { key: user._id, throws: true });
-
-    const { context } = await loadStylistInputs(ctx, user._id);
-    const occasionContext = occasion
-      ? `\nOccasion: ${occasion}${weather ? `\nWeather: ${weather}` : ""}`
-      : "";
-
-    const { thread } = await stylistAgent.continueThread(ctx, { threadId });
-    const result = await thread.generateText({
-      prompt: `${context}${occasionContext}\n\n${prompt}`,
-    });
-
-    return result.text;
+  returns: v.null(),
+  handler: async (ctx, { threadId, userId, promptMessageId }) => {
+    const { system } = await loadStylistInputs(ctx, userId);
+    const result = await stylistAgent.streamText(
+      ctx,
+      { threadId, userId },
+      { promptMessageId, system },
+      { saveStreamDeltas: true },
+    );
+    await result.consumeStream();
+    return null;
   },
 });
 
@@ -111,42 +105,43 @@ export const generateOutfits = action({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new ConvexError("Not authenticated");
 
-    const user = (await ctx.runQuery(internal.stylingInternal.getUserByToken, {
+    const user = await ctx.runQuery(internal.stylingInternal.getUserByToken, {
       tokenIdentifier: identity.tokenIdentifier,
-    })) as { _id: Id<"users"> } | null;
+    });
     if (!user) throw new ConvexError("User not found");
 
     await rateLimiter.limit(ctx, "composeLooks", { key: user._id, throws: true });
 
-    const { inventory, context } = await loadStylistInputs(ctx, user._id);
+    const { inventory, system } = await loadStylistInputs(ctx, user._id);
     if (inventory.length === 0) {
       return { looks: [], missing: "Photograph the closet first." };
     }
 
-    const { threadId } = await stylistAgent.createThread(ctx, { userId: user._id });
-    const { thread } = await stylistAgent.continueThread(ctx, { threadId });
-
+    // One-shot structured call: no thread to accumulate, no JSON to scrape.
     const weatherLine = weather ? `\nWeather: ${weather}` : "";
-    const result = await thread.generateText({
-      prompt: `${context}\n\nOccasion: ${occasion}${weatherLine}\n\n${OUTFIT_REQUEST}`,
-    });
-
     let payload;
     try {
-      payload = parseLooksPayload(result.text);
-    } catch {
+      const result = await generateText({
+        model: stylistModel,
+        system,
+        prompt: `Occasion: ${occasion}${weatherLine}\n\n${OUTFIT_REQUEST}`,
+        output: Output.object({ schema: looksPayloadSchema }),
+      });
+      payload = result.output;
+    } catch (err) {
+      console.error("[generateOutfits] failed:", err);
       throw new ConvexError("The stylist could not compose from this closet.");
     }
-    const looks: ComposedLook[] = [];
 
+    const looks: ComposedLook[] = [];
     for (const look of payload.looks) {
-      const pieces = (await ctx.runQuery(internal.stylingInternal.hydratePiecesInternal, {
+      const pieces: LookPiece[] = await ctx.runQuery(internal.stylingInternal.hydratePiecesInternal, {
         userId: user._id,
         itemIds: look.itemIds,
-      })) as LookPiece[];
+      });
       if (pieces.length === 0) continue;
 
-      await ctx.runMutation(internal.stylingInternal.createOutfitInternal, {
+      const outfitId: Id<"outfits"> = await ctx.runMutation(internal.stylingInternal.createOutfitInternal, {
         userId: user._id,
         name: look.name,
         itemIds: pieces.map((piece) => piece.itemId),
@@ -155,11 +150,7 @@ export const generateOutfits = action({
         rationale: look.rationale,
       });
 
-      looks.push({
-        name: look.name,
-        rationale: look.rationale,
-        pieces,
-      });
+      looks.push({ outfitId, name: look.name, rationale: look.rationale, pieces });
     }
 
     return {

@@ -1,4 +1,4 @@
-import { useAction, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { Link } from "expo-router";
 import { useState } from "react";
 import {
@@ -16,7 +16,7 @@ import { describeError } from "@/lib/errors";
 import Colors from "@/constants/Colors";
 import { Fonts } from "@/constants/Fonts";
 import { useColorScheme } from "@/components/useColorScheme";
-import { LookCard, type Look } from "@/components/LookCard";
+import { LookCard } from "@/components/LookCard";
 import { OCCASIONS } from "@/lib/types";
 
 export default function StyleMeScreen() {
@@ -25,10 +25,12 @@ export default function StyleMeScreen() {
   const insets = useSafeAreaInsets();
   const items = useQuery(api.wardrobe.list, {});
   const generateOutfits = useAction(api.stylingAgent.generateOutfits);
+  const removeOutfit = useMutation(api.outfits.remove);
+  // Composed looks are saved as outfits, so the list survives leaving the tab.
+  const looks = useQuery(api.outfits.listLooks, {});
 
   const [occasion, setOccasion] = useState("casual");
   const [weather, setWeather] = useState("");
-  const [looks, setLooks] = useState<Look[]>([]);
   const [missing, setMissing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -45,10 +47,8 @@ export default function StyleMeScreen() {
         occasion,
         weather: weather.trim() || undefined,
       });
-      setLooks(result.looks);
       setMissing(result.missing);
     } catch (err) {
-      setLooks([]);
       setError(describeError(err, "Could not compose looks."));
     } finally {
       setLoading(false);
@@ -122,17 +122,19 @@ export default function StyleMeScreen() {
 
       {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
 
-      {looks.map((look) => (
-        <LookCard key={look.name} look={look} />
+      {missing ? (
+        <Text accessibilityLiveRegion="polite" style={[styles.missing, { color: colors.textSecondary }]}>
+          {missing}
+        </Text>
+      ) : null}
+
+      {looks?.map((look) => (
+        <LookCard
+          key={look.outfitId}
+          look={look}
+          onRemove={() => void removeOutfit({ outfitId: look.outfitId })}
+        />
       ))}
-
-      {missing && looks.length === 0 ? (
-        <Text style={[styles.missing, { color: colors.textSecondary }]}>{missing}</Text>
-      ) : null}
-
-      {missing && looks.length > 0 ? (
-        <Text style={[styles.note, { color: colors.textMuted }]}>{missing}</Text>
-      ) : null}
     </ScrollView>
   );
 }
@@ -207,11 +209,5 @@ const styles = StyleSheet.create({
     fontSize: 22,
     lineHeight: 30,
     marginTop: 12,
-  },
-  note: {
-    fontFamily: Fonts.sans,
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 8,
   },
 });

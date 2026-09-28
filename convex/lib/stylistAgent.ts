@@ -1,12 +1,12 @@
-import { anthropic } from "@ai-sdk/anthropic";
 import { Agent, createTool } from "@convex-dev/agent";
 import { z } from "zod";
 import { components, internal } from "../_generated/api";
+import { stylistModel } from "./models";
 import { STYLIST_INSTRUCTIONS } from "./styleCanon";
 
 export const stylistAgent = new Agent(components.agent, {
   name: "Fashion Stylist",
-  languageModel: anthropic("claude-sonnet-5"),
+  languageModel: stylistModel,
   instructions: STYLIST_INSTRUCTIONS,
   tools: {
     searchWardrobe: createTool({
