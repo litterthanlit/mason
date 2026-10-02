@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
 
 export const getUserByToken = internalQuery({
@@ -124,18 +124,30 @@ export const createOutfitInternal = internalMutation({
   args: {
     userId: v.id("users"),
     name: v.optional(v.string()),
-    itemIds: v.array(v.id("wardrobeItems")),
+    // Raw strings: the stylist tool passes model output straight through.
+    itemIds: v.array(v.string()),
     occasion: v.string(),
     weather: v.optional(v.string()),
     rationale: v.string(),
   },
   returns: v.id("outfits"),
   handler: async (ctx, args) => {
+    const itemIds: Id<"wardrobeItems">[] = [];
+    for (const raw of args.itemIds) {
+      const id = ctx.db.normalizeId("wardrobeItems", raw);
+      if (!id || itemIds.includes(id)) continue;
+      const item = await ctx.db.get("wardrobeItems", id);
+      if (item && item.userId === args.userId) itemIds.push(id);
+    }
+    if (itemIds.length === 0) {
+      throw new Error("None of these pieces are in this closet");
+    }
+
     const now = Date.now();
     return await ctx.db.insert("outfits", {
       userId: args.userId,
       name: args.name,
-      itemIds: args.itemIds,
+      itemIds,
       occasion: args.occasion,
       weather: args.weather,
       rationale: args.rationale,

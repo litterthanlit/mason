@@ -1,33 +1,24 @@
-import { useAction, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { Link } from "expo-router";
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StyleSheet, Text, View } from "react-native";
 import { api } from "@/convex/_generated/api";
-import Colors from "@/constants/Colors";
+import { LookCard } from "@/components/LookCard";
+import { Body, Button, Chip, ErrorText, Field, Kicker, Screen, Title, space, useTheme } from "@/components/ui";
 import { Fonts } from "@/constants/Fonts";
-import { useColorScheme } from "@/components/useColorScheme";
-import { LookCard, type Look } from "@/components/LookCard";
+import { describeError } from "@/lib/errors";
 import { OCCASIONS } from "@/lib/types";
 
 export default function StyleMeScreen() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme];
-  const insets = useSafeAreaInsets();
+  const colors = useTheme();
   const items = useQuery(api.wardrobe.list, {});
+  // Composed looks are saved as outfits, so the list survives leaving the tab.
+  const looks = useQuery(api.outfits.listLooks, {});
   const generateOutfits = useAction(api.stylingAgent.generateOutfits);
+  const removeOutfit = useMutation(api.outfits.remove);
 
-  const [occasion, setOccasion] = useState("casual");
+  const [occasion, setOccasion] = useState<string>("casual");
   const [weather, setWeather] = useState("");
-  const [looks, setLooks] = useState<Look[]>([]);
   const [missing, setMissing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -40,177 +31,68 @@ export default function StyleMeScreen() {
     setError("");
     setMissing(null);
     try {
-      const result = await generateOutfits({
-        occasion,
-        weather: weather.trim() || undefined,
-      });
-      setLooks(result.looks);
+      const result = await generateOutfits({ occasion, weather: weather.trim() || undefined });
       setMissing(result.missing);
     } catch (err) {
-      setLooks([]);
-      setError(err instanceof Error ? err.message : "Could not compose looks.");
+      setError(describeError(err, "Could not compose looks."));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 24 }]}
-    >
-      <Text style={[styles.kicker, { color: colors.textMuted }]}>Style</Text>
-      <Text style={[styles.title, { color: colors.text }]}>Looks</Text>
-      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-        Two, from the closet. Silhouette first.
-      </Text>
+    <Screen headerless>
+      <Kicker>Style</Kicker>
+      <Title style={styles.title}>Looks</Title>
+      <Body style={styles.subtitle}>Two, from the closet. Silhouette first.</Body>
 
       {emptyCloset ? (
         <View style={styles.empty}>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            Photograph the closet first.
-          </Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Photograph the closet first.</Text>
           <Link href="/closet/add" asChild>
-            <Pressable style={[styles.button, { backgroundColor: colors.tint }]}>
-              <Text style={[styles.buttonText, { color: colors.onTint }]}>Add a garment</Text>
-            </Pressable>
+            <Button label="Add a garment" />
           </Link>
         </View>
       ) : (
         <>
-          <View style={styles.occasions}>
-            {OCCASIONS.map((occ) => {
-              const selected = occasion === occ;
-              return (
-                <Pressable key={occ} onPress={() => setOccasion(occ)} hitSlop={8}>
-                  <Text
-                    style={[
-                      styles.occasion,
-                      { color: selected ? colors.text : colors.textMuted },
-                      selected && { borderBottomColor: colors.text },
-                    ]}
-                  >
-                    {occ}
-                  </Text>
-                </Pressable>
-              );
-            })}
+          <View style={styles.occasions} accessibilityRole="radiogroup" accessibilityLabel="Occasion">
+            {OCCASIONS.map((occ) => (
+              <Chip key={occ} label={occ} selected={occasion === occ} onPress={() => setOccasion(occ)} />
+            ))}
           </View>
 
-          <TextInput
-            style={[styles.input, { borderBottomColor: colors.border, color: colors.text }]}
-            placeholder="Weather, if it matters"
-            placeholderTextColor={colors.textMuted}
+          <Field
+            label="Weather"
+            placeholder="If it matters: cold rain, 30°, humid"
             value={weather}
             onChangeText={setWeather}
+            returnKeyType="done"
           />
 
-          <Pressable
-            style={[styles.button, { backgroundColor: colors.tint, opacity: loading ? 0.45 : 1 }]}
-            onPress={handleCompose}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.onTint} />
-            ) : (
-              <Text style={[styles.buttonText, { color: colors.onTint }]}>Compose</Text>
-            )}
-          </Pressable>
+          <Button label="Compose" onPress={handleCompose} loading={loading} />
         </>
       )}
 
-      {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
+      {error ? <ErrorText>{error}</ErrorText> : null}
 
-      {looks.map((look) => (
-        <LookCard key={look.name} look={look} />
+      {missing ? (
+        <Text accessibilityLiveRegion="polite" style={[styles.missing, { color: colors.textSecondary }]}>
+          {missing}
+        </Text>
+      ) : null}
+
+      {looks?.map((look) => (
+        <LookCard key={look.outfitId} look={look} onRemove={() => void removeOutfit({ outfitId: look.outfitId })} />
       ))}
-
-      {missing && looks.length === 0 ? (
-        <Text style={[styles.missing, { color: colors.textSecondary }]}>{missing}</Text>
-      ) : null}
-
-      {missing && looks.length > 0 ? (
-        <Text style={[styles.note, { color: colors.textMuted }]}>{missing}</Text>
-      ) : null}
-    </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { paddingHorizontal: 20, paddingBottom: 48, gap: 16 },
-  kicker: {
-    fontFamily: Fonts.sans,
-    fontSize: 11,
-    letterSpacing: 2.4,
-    textTransform: "uppercase",
-  },
-  title: {
-    fontFamily: Fonts.serif,
-    fontSize: 48,
-    lineHeight: 50,
-    letterSpacing: -1,
-    marginTop: -8,
-  },
-  subtitle: {
-    fontFamily: Fonts.sans,
-    fontSize: 16,
-    lineHeight: 22,
-    marginBottom: 8,
-  },
-  occasions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 16,
-    rowGap: 12,
-  },
-  occasion: {
-    fontFamily: Fonts.sans,
-    fontSize: 13,
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: "transparent",
-  },
-  input: {
-    fontFamily: Fonts.sans,
-    fontSize: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  button: {
-    marginTop: 8,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  buttonText: {
-    fontFamily: Fonts.sansMedium,
-    fontSize: 12,
-    letterSpacing: 2.2,
-    textTransform: "uppercase",
-  },
-  empty: { gap: 20, paddingTop: 12 },
-  emptyText: {
-    fontFamily: Fonts.serifItalic,
-    fontSize: 22,
-    lineHeight: 28,
-  },
-  error: {
-    fontFamily: Fonts.sans,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  missing: {
-    fontFamily: Fonts.serifItalic,
-    fontSize: 22,
-    lineHeight: 30,
-    marginTop: 12,
-  },
-  note: {
-    fontFamily: Fonts.sans,
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 8,
-  },
+  title: { marginTop: -space.sm },
+  subtitle: { marginBottom: space.sm },
+  occasions: { flexDirection: "row", flexWrap: "wrap", columnGap: space.lg },
+  empty: { gap: space.xl, paddingTop: space.md },
+  emptyText: { fontFamily: Fonts.serifItalic, fontSize: 22, lineHeight: 28 },
+  missing: { fontFamily: Fonts.serifItalic, fontSize: 22, lineHeight: 30, marginTop: space.md },
 });

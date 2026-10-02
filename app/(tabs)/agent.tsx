@@ -1,4 +1,7 @@
-import { useAction, useMutation } from "convex/react";
+import { optimisticallySendMessage, useSmoothText, useUIMessages, type UIMessage } from "@convex-dev/agent/react";
+import { useHeaderHeight } from "expo-router/react-navigation";
+import { useMutation, useQuery } from "convex/react";
+import { Tabs } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -12,45 +15,58 @@ import {
   View,
 } from "react-native";
 import { api } from "@/convex/_generated/api";
+import { describeError } from "@/lib/errors";
 import Colors from "@/constants/Colors";
+import { Fonts } from "@/constants/Fonts";
 import { useColorScheme } from "@/components/useColorScheme";
-
-type Message = { role: "user" | "assistant"; content: string };
 
 export default function AgentScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const headerHeight = useHeaderHeight();
+
+  const threadId = useQuery(api.styling.currentThread);
   const createThread = useMutation(api.styling.createThread);
-  const sendMessage = useAction(api.stylingAgent.sendMessage);
+  const sendMessage = useMutation(api.styling.sendChatMessage).withOptimisticUpdate(
+    optimisticallySendMessage(api.styling.listThreadMessages),
+  );
 
-  const [threadId, setThreadId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { results: messages, status, loadMore } = useUIMessages(
+    api.styling.listThreadMessages,
+    threadId ? { threadId } : "skip",
+    { initialNumItems: 20, stream: true },
+  );
+
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const listRef = useRef<FlatList>(null);
+  const [error, setError] = useState("");
+  const creating = useRef(false);
+  const listRef = useRef<FlatList<UIMessage>>(null);
 
+  // First visit: open a thread. Later visits resume the saved one.
   useEffect(() => {
-    void createThread().then(setThreadId);
-  }, [createThread]);
+    if (threadId !== null || creating.current) return;
+    creating.current = true;
+    createThread()
+      .catch((err: unknown) => setError(describeError(err, "Could not open the stylist.")))
+      .finally(() => {
+        creating.current = false;
+      });
+  }, [threadId, createThread]);
+
+  const replying = messages.some((m) => m.role === "assistant" && m.status === "streaming");
+  const lastIsUser = messages.at(-1)?.role === "user";
+  const waiting = replying || lastIsUser;
 
   async function handleSend() {
-    if (!threadId || !input.trim() || loading) return;
-
     const prompt = input.trim();
+    if (!threadId || !prompt || waiting) return;
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: prompt }]);
-    setLoading(true);
-
+    setError("");
     try {
-      const reply = await sendMessage({ threadId, prompt });
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      await sendMessage({ threadId, prompt });
     } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: err instanceof Error ? err.message : "Something went wrong" },
-      ]);
-    } finally {
-      setLoading(false);
+      setInput(prompt);
+      setError(describeError(err, "Message not sent."));
     }
   }
 
@@ -58,85 +74,145 @@ export default function AgentScreen() {
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={90}
+      keyboardVerticalOffset={headerHeight}
     >
+      <Tabs.Screen
+        options={{
+          headerRight: () =>
+            messages.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Start a new conversation"
+                onPress={() => void createThread()}
+                hitSlop={12}
+                style={styles.headerAction}
+              >
+                <Text style={[styles.headerActionText, { color: colors.textSecondary }]}>New</Text>
+              </Pressable>
+            ) : null,
+        }}
+      />
+
       <FlatList
         ref={listRef}
         data={messages}
-        keyExtractor={(_, i) => String(i)}
+        keyExtractor={(item) => item.key}
         contentContainerStyle={styles.messages}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        onScroll={({ nativeEvent }) => {
+          if (nativeEvent.contentOffset.y < 40 && status === "CanLoadMore") loadMore(20);
+        }}
+        scrollEventThrottle={200}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>Stylist</Text>
-            <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-              What are you dressing for. Occasion, a piece you cannot place, or a look that feels unfinished.
-            </Text>
-          </View>
+          threadId === undefined || status === "LoadingFirstPage" ? (
+            <ActivityIndicator color={colors.tint} style={styles.loading} accessibilityLabel="Loading conversation" />
+          ) : (
+            <View style={styles.empty}>
+              <Text style={[styles.kicker, { color: colors.textMuted }]}>Stylist</Text>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>What are you dressing for.</Text>
+              <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+                An occasion, a piece you cannot place, or a look that feels unfinished.
+              </Text>
+            </View>
+          )
         }
-        renderItem={({ item }) => (
-          <View
-            style={[
-              styles.bubble,
-              item.role === "user"
-                ? [styles.userBubble, { backgroundColor: colors.tint }]
-                : [styles.assistantBubble, { backgroundColor: colors.backgroundSecondary }],
-            ]}
-          >
-            <Text style={{ color: item.role === "user" ? "#FFFFFF" : colors.text, lineHeight: 20 }}>
-              {item.content}
-            </Text>
-          </View>
-        )}
-        ListFooterComponent={loading ? <ActivityIndicator color={colors.tint} style={{ marginTop: 12 }} /> : null}
+        renderItem={({ item }) => <MessageBubble message={item} />}
+        ListFooterComponent={
+          lastIsUser ? (
+            <ActivityIndicator color={colors.textMuted} style={styles.typing} accessibilityLabel="Stylist is replying" />
+          ) : null
+        }
       />
 
-      <View style={[styles.inputRow, { borderTopColor: colors.borderLight, backgroundColor: colors.background }]}>
+      {error ? (
+        <Text accessibilityLiveRegion="polite" style={[styles.error, { color: colors.error }]}>
+          {error}
+        </Text>
+      ) : null}
+
+      <View style={[styles.inputRow, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
         <TextInput
-          style={[styles.input, { color: colors.text, backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+          style={[styles.input, { color: colors.text, borderBottomColor: colors.border }]}
           placeholder="What are you dressing for"
           placeholderTextColor={colors.textMuted}
+          accessibilityLabel="Message the stylist"
           value={input}
           onChangeText={setInput}
           multiline
         />
         <Pressable
-          style={[styles.sendButton, { backgroundColor: colors.tint, opacity: !input.trim() || loading ? 0.5 : 1 }]}
+          style={[styles.sendButton, { backgroundColor: colors.tint, opacity: !input.trim() || waiting ? 0.45 : 1 }]}
           onPress={handleSend}
-          disabled={!input.trim() || loading || !threadId}
+          disabled={!input.trim() || waiting || !threadId}
+          accessibilityRole="button"
+          accessibilityLabel="Send"
+          accessibilityState={{ disabled: !input.trim() || waiting || !threadId }}
         >
-          <Text style={styles.sendText}>Send</Text>
+          <Text style={[styles.sendText, { color: colors.onTint }]}>Send</Text>
         </Pressable>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
+function MessageBubble({ message }: { message: UIMessage }) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const isUser = message.role === "user";
+  const [text] = useSmoothText(message.text, { startStreaming: message.status === "streaming" });
+
+  if (isUser) {
+    return (
+      <View style={[styles.bubble, styles.userBubble, { backgroundColor: colors.tint }]}>
+        <Text style={[styles.userText, { color: colors.onTint }]}>{message.text}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.assistant} accessibilityLiveRegion={message.status === "streaming" ? "polite" : "none"}>
+      <Text style={[styles.assistantText, { color: colors.text }]}>{text || " "}</Text>
+      {message.status === "failed" ? (
+        <Text style={[styles.failed, { color: colors.error }]}>The stylist could not finish this reply.</Text>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  messages: { padding: 16, gap: 12, flexGrow: 1 },
-  empty: { paddingTop: 60, alignItems: "center", gap: 8 },
-  emptyTitle: { fontSize: 20, fontWeight: "600" },
-  emptyBody: { fontSize: 14, textAlign: "center", lineHeight: 20, paddingHorizontal: 24 },
-  bubble: { maxWidth: "85%", padding: 14, borderRadius: 16 },
-  userBubble: { alignSelf: "flex-end", borderBottomRightRadius: 4 },
-  assistantBubble: { alignSelf: "flex-start", borderBottomLeftRadius: 4 },
+  messages: { padding: 20, gap: 20, flexGrow: 1 },
+  loading: { marginTop: 60 },
+  empty: { paddingTop: 48, gap: 10 },
+  kicker: { fontFamily: Fonts.sans, fontSize: 11, letterSpacing: 2.4, textTransform: "uppercase" },
+  emptyTitle: { fontFamily: Fonts.serif, fontSize: 36, lineHeight: 40, letterSpacing: -0.6 },
+  emptyBody: { fontFamily: Fonts.sans, fontSize: 15, lineHeight: 22 },
+  bubble: { maxWidth: "85%", paddingHorizontal: 14, paddingVertical: 10 },
+  userBubble: { alignSelf: "flex-end" },
+  userText: { fontFamily: Fonts.sans, fontSize: 15, lineHeight: 21 },
+  assistant: { maxWidth: "92%", alignSelf: "flex-start", gap: 6 },
+  assistantText: { fontFamily: Fonts.sans, fontSize: 16, lineHeight: 24 },
+  failed: { fontFamily: Fonts.sans, fontSize: 13 },
+  typing: { alignSelf: "flex-start", marginTop: 4 },
+  error: { fontFamily: Fonts.sans, fontSize: 14, paddingHorizontal: 20, paddingBottom: 8 },
+  headerAction: { paddingHorizontal: 16 },
+  headerActionText: { fontFamily: Fonts.sans, fontSize: 12, letterSpacing: 1.6, textTransform: "uppercase" },
   inputRow: {
     flexDirection: "row",
-    padding: 12,
-    gap: 8,
-    borderTopWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
     alignItems: "flex-end",
   },
   input: {
     flex: 1,
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    maxHeight: 100,
+    fontFamily: Fonts.sans,
     fontSize: 16,
+    paddingVertical: 10,
+    maxHeight: 120,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  sendButton: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20 },
-  sendText: { color: "#FFFFFF", fontWeight: "600" },
+  sendButton: { paddingHorizontal: 18, paddingVertical: 12, minHeight: 44, justifyContent: "center" },
+  sendText: { fontFamily: Fonts.sansMedium, fontSize: 12, letterSpacing: 2.2, textTransform: "uppercase" },
 });

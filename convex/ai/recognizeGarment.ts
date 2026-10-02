@@ -2,6 +2,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
+import { GEMINI_VISION_MODEL, geminiImageType } from "../lib/models";
 
 export const garmentCategorySchema = z.enum([
   "top",
@@ -68,14 +69,13 @@ export async function recognizeGarment(imageUrl: string): Promise<GarmentAttribu
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: GEMINI_VISION_MODEL });
 
     const imageRes = await fetch(imageUrl);
     if (!imageRes.ok) {
       throw new Error(`Failed to fetch image: ${imageRes.status}`);
     }
 
-    const contentType = imageRes.headers.get("content-type") ?? "image/jpeg";
     const buffer = await imageRes.arrayBuffer();
     const base64 = Buffer.from(buffer).toString("base64");
 
@@ -84,7 +84,7 @@ export async function recognizeGarment(imageUrl: string): Promise<GarmentAttribu
       {
         inlineData: {
           data: base64,
-          mimeType: contentType as "image/jpeg" | "image/png" | "image/webp",
+          mimeType: geminiImageType(imageRes.headers.get("content-type")),
         },
       },
     ]);
@@ -94,7 +94,8 @@ export async function recognizeGarment(imageUrl: string): Promise<GarmentAttribu
     const parsed = JSON.parse(cleaned);
     return garmentAttributesSchema.parse(parsed);
   } catch (err) {
+    // Fail the job instead of saving a fake "clothing item" the user never sees flagged.
     console.error("[recognizeGarment] failed:", err);
-    return FALLBACK;
+    throw new Error("Could not read this garment. Try another photo.");
   }
 }

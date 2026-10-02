@@ -6,11 +6,12 @@ import { convex } from "@/lib/convex";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-export function ConvexClerkProvider({ children }: { children: ReactNode }) {
-  if (!publishableKey) {
-    return <>{children}</>;
-  }
+if (!publishableKey) {
+  // Rendering without providers only defers this to a cryptic useQuery crash.
+  throw new Error("EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is not set");
+}
 
+export function ConvexClerkProvider({ children }: { children: ReactNode }) {
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <ConvexProviderWithClerk client={convex} useAuth={useAuth}>

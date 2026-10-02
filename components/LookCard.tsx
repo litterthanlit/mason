@@ -14,26 +14,54 @@ export type LookPiece = {
 };
 
 export type Look = {
+  outfitId: Id<"outfits">;
   name: string;
   rationale: string;
+  occasion?: string;
   pieces: LookPiece[];
 };
 
-export function LookCard({ look }: { look: Look }) {
+type Props = {
+  look: Look;
+  onRemove?: () => void;
+};
+
+export function LookCard({ look, onRemove }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
 
   return (
     <View style={[styles.wrap, { borderTopColor: colors.border }]}>
-      <Text style={[styles.name, { color: colors.text }]}>{look.name}</Text>
-      <View style={[styles.strip, { borderColor: colors.border }]}>
+      <View style={styles.header}>
+        <View style={styles.titleBlock}>
+          {look.occasion ? (
+            <Text style={[styles.occasion, { color: colors.textMuted }]}>{look.occasion}</Text>
+          ) : null}
+          <Text style={[styles.name, { color: colors.text }]} accessibilityRole="header">
+            {look.name}
+          </Text>
+        </View>
+        {onRemove ? (
+          <Pressable
+            onPress={onRemove}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove look ${look.name}`}
+          >
+            <Text style={[styles.remove, { color: colors.textMuted }]}>Remove</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      <View style={styles.strip}>
         {look.pieces.map((piece) => (
           <Link key={piece.itemId} href={`/closet/${piece.itemId}`} asChild>
-            <Pressable style={styles.piece}>
+            <Pressable style={styles.piece} accessibilityRole="link" accessibilityLabel={piece.name}>
               <Image
                 source={{ uri: piece.imageUrl }}
                 style={[styles.image, { backgroundColor: colors.backgroundSecondary }]}
                 contentFit="cover"
+                transition={150}
+                accessibilityIgnoresInvertColors
               />
               <Text style={[styles.pieceName, { color: colors.textMuted }]} numberOfLines={1}>
                 {piece.name}
@@ -42,7 +70,9 @@ export function LookCard({ look }: { look: Look }) {
           </Link>
         ))}
       </View>
-      <Text style={[styles.rationale, { color: colors.textSecondary }]}>{look.rationale}</Text>
+      {look.rationale ? (
+        <Text style={[styles.rationale, { color: colors.textSecondary }]}>{look.rationale}</Text>
+      ) : null}
     </View>
   );
 }
@@ -52,13 +82,27 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingTop: 28,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "transparent",
+  },
+  header: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 16 },
+  titleBlock: { flex: 1, gap: 4 },
+  occasion: {
+    fontFamily: Fonts.sans,
+    fontSize: 11,
+    letterSpacing: 2.2,
+    textTransform: "uppercase",
   },
   name: {
     fontFamily: Fonts.serifItalic,
     fontSize: 32,
     lineHeight: 36,
     letterSpacing: -0.4,
+  },
+  remove: {
+    fontFamily: Fonts.sans,
+    fontSize: 11,
+    letterSpacing: 1.6,
+    textTransform: "uppercase",
+    paddingBottom: 6,
   },
   strip: {
     flexDirection: "row",

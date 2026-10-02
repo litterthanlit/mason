@@ -1,11 +1,11 @@
 import { Image } from "expo-image";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import Colors from "@/constants/Colors";
-import { useColorScheme } from "@/components/useColorScheme";
+import { Swatch } from "@/components/Swatch";
+import { space, useTheme } from "@/components/ui";
+import { Fonts } from "@/constants/Fonts";
 import { CATEGORY_LABELS, type GarmentCategory } from "@/lib/types";
 
 type Props = {
-  id: string;
   name: string;
   imageUrl: string;
   category: GarmentCategory;
@@ -14,25 +14,30 @@ type Props = {
 };
 
 export function ItemCard({ name, imageUrl, category, colors: itemColors, onPress }: Props) {
-  const colorScheme = useColorScheme();
-  const theme = Colors[colorScheme];
+  const theme = useTheme();
 
   return (
     <Pressable
-      style={[styles.card, { backgroundColor: theme.card, borderColor: theme.borderLight }]}
+      style={({ pressed }) => [styles.card, { opacity: pressed ? 0.85 : 1 }]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${name}, ${CATEGORY_LABELS[category]}`}
     >
-      <Image source={{ uri: imageUrl }} style={styles.image} contentFit="cover" />
+      <Image
+        source={{ uri: imageUrl }}
+        style={[styles.image, { backgroundColor: theme.backgroundSecondary }]}
+        contentFit="cover"
+        transition={150}
+        recyclingKey={imageUrl}
+      />
       <View style={styles.content}>
+        <Text style={[styles.category, { color: theme.textMuted }]}>{CATEGORY_LABELS[category]}</Text>
         <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
           {name}
         </Text>
-        <Text style={[styles.category, { color: theme.textSecondary }]}>
-          {CATEGORY_LABELS[category]}
-        </Text>
         <View style={styles.swatches}>
-          {itemColors.slice(0, 4).map((color) => (
-            <View key={color} style={[styles.swatch, { backgroundColor: color }]} />
+          {itemColors.slice(0, 4).map((color, i) => (
+            <Swatch key={`${color}-${i}`} color={color} size={12} />
           ))}
         </View>
       </View>
@@ -41,39 +46,10 @@ export function ItemCard({ name, imageUrl, category, colors: itemColors, onPress
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: 12,
-    borderWidth: 1,
-    overflow: "hidden",
-    flex: 1,
-    minWidth: "45%",
-    maxWidth: "48%",
-  },
-  image: {
-    width: "100%",
-    aspectRatio: 3 / 4,
-  },
-  content: {
-    padding: 10,
-    gap: 4,
-  },
-  name: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  category: {
-    fontSize: 12,
-  },
-  swatches: {
-    flexDirection: "row",
-    gap: 4,
-    marginTop: 4,
-  },
-  swatch: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.1)",
-  },
+  card: { flex: 1, maxWidth: "50%" },
+  image: { width: "100%", aspectRatio: 3 / 4 },
+  content: { paddingTop: space.sm, gap: 3 },
+  category: { fontFamily: Fonts.sans, fontSize: 10, letterSpacing: 1.6, textTransform: "uppercase" },
+  name: { fontFamily: Fonts.sans, fontSize: 14 },
+  swatches: { flexDirection: "row", gap: 4, marginTop: 4 },
 });

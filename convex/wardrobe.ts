@@ -1,16 +1,7 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
-
-const garmentCategory = v.union(
-  v.literal("top"),
-  v.literal("bottom"),
-  v.literal("dress"),
-  v.literal("outerwear"),
-  v.literal("shoes"),
-  v.literal("accessory"),
-  v.literal("bag"),
-  v.literal("other"),
-);
+import { claimUpload, releaseUpload } from "./lib/uploads";
+import { garmentCategory } from "./lib/validators";
 
 const wardrobeItemValidator = v.object({
   _id: v.id("wardrobeItems"),
@@ -84,8 +75,9 @@ export const create = authedMutation({
   },
   returns: v.id("wardrobeItems"),
   handler: async (ctx, args) => {
+    await claimUpload(ctx, ctx.user._id, args.storageId);
     const imageUrl = await ctx.storage.getUrl(args.storageId);
-    if (!imageUrl) throw new Error("Image not found");
+    if (!imageUrl) throw new ConvexError("Image not found");
 
     const now = Date.now();
     return await ctx.db.insert("wardrobeItems", {
@@ -129,7 +121,7 @@ export const update = authedMutation({
   handler: async (ctx, { itemId, ...updates }) => {
     const item = await ctx.db.get("wardrobeItems", itemId);
     if (!item || item.userId !== ctx.user._id) {
-      throw new Error("Item not found");
+      throw new ConvexError("Item not found");
     }
 
     const patch: Record<string, unknown> = { updatedAt: Date.now() };
@@ -148,62 +140,26 @@ export const remove = authedMutation({
   handler: async (ctx, { itemId }) => {
     const item = await ctx.db.get("wardrobeItems", itemId);
     if (!item || item.userId !== ctx.user._id) {
-      throw new Error("Item not found");
+      throw new ConvexError("Item not found");
     }
-    await ctx.db.delete("wardrobeItems", itemId);
-    return null;
-  },
-});
 
-export const search = authedQuery({
-  args: {
-    category: v.optional(garmentCategory),
-    color: v.optional(v.string()),
-    season: v.optional(v.string()),
-  },
-  returns: v.array(wardrobeItemValidator),
-  handler: async (ctx, args) => {
-    const items = await ctx.db
-      .query("wardrobeItems")
+    // Outfits keep raw ids; drop the piece so looks never point at a deleted garment.
+    const outfits = await ctx.db
+      .query("outfits")
       .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
       .collect();
-
-    return items.filter((item) => {
-      if (args.category && item.category !== args.category) return false;
-      if (args.season && !item.season.includes(args.season)) return false;
-      if (args.color && !item.colors.some((c) => c.toLowerCase().includes(args.color!.toLowerCase()))) {
-        return false;
+    for (const outfit of outfits) {
+      if (!outfit.itemIds.includes(itemId)) continue;
+      const remaining = outfit.itemIds.filter((id) => id !== itemId);
+      if (remaining.length === 0) {
+        await ctx.db.delete("outfits", outfit._id);
+      } else {
+        await ctx.db.patch("outfits", outfit._id, { itemIds: remaining, updatedAt: Date.now() });
       }
-      return true;
-    });
-  },
-});
+    }
 
-export const getInventorySummary = authedQuery({
-  args: {},
-  returns: v.array(
-    v.object({
-      _id: v.id("wardrobeItems"),
-      name: v.string(),
-      category: garmentCategory,
-      colors: v.array(v.string()),
-      season: v.array(v.string()),
-      occasions: v.array(v.string()),
-    }),
-  ),
-  handler: async (ctx) => {
-    const items = await ctx.db
-      .query("wardrobeItems")
-      .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
-      .collect();
-
-    return items.map((item) => ({
-      _id: item._id,
-      name: item.name,
-      category: item.category,
-      colors: item.colors,
-      season: item.season,
-      occasions: item.occasions,
-    }));
+    await ctx.db.delete("wardrobeItems", itemId);
+    await releaseUpload(ctx, item.storageId);
+    return null;
   },
 });

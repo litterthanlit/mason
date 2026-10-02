@@ -1,43 +1,8 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { garmentAttributes, garmentCategory, jobStatus, recognitionType } from "./lib/validators";
 
 const timestamp = v.number();
-
-const jobStatus = v.union(
-  v.literal("queued"),
-  v.literal("running"),
-  v.literal("complete"),
-  v.literal("failed"),
-);
-
-const recognitionType = v.union(
-  v.literal("garment"),
-  v.literal("style_dna"),
-);
-
-const garmentCategory = v.union(
-  v.literal("top"),
-  v.literal("bottom"),
-  v.literal("dress"),
-  v.literal("outerwear"),
-  v.literal("shoes"),
-  v.literal("accessory"),
-  v.literal("bag"),
-  v.literal("other"),
-);
-
-const garmentAttributes = v.object({
-  category: garmentCategory,
-  subcategory: v.string(),
-  colors: v.array(v.string()),
-  pattern: v.string(),
-  fit: v.string(),
-  season: v.array(v.string()),
-  occasions: v.array(v.string()),
-  material: v.optional(v.string()),
-  brand: v.optional(v.string()),
-  confidence: v.number(),
-});
 
 export default defineSchema({
   users: defineTable({
@@ -75,6 +40,13 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_and_category", ["userId", "category"]),
 
+  // Who uploaded each file; claimed on first use (see lib/uploads.ts).
+  uploads: defineTable({
+    storageId: v.id("_storage"),
+    userId: v.id("users"),
+    createdAt: timestamp,
+  }).index("by_storage", ["storageId"]),
+
   recognitionJobs: defineTable({
     userId: v.id("users"),
     storageId: v.id("_storage"),
@@ -105,6 +77,15 @@ export default defineSchema({
     referenceStorageIds: v.array(v.id("_storage")),
     confidence: v.number(),
     referenceCount: v.number(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }).index("by_user", ["userId"]),
+
+  // One row per "Analyze" tap, so the app can show progress and failures.
+  styleDnaJobs: defineTable({
+    userId: v.id("users"),
+    status: jobStatus,
+    error: v.optional(v.string()),
     createdAt: timestamp,
     updatedAt: timestamp,
   }).index("by_user", ["userId"]),

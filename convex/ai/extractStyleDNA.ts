@@ -2,6 +2,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
+import { GEMINI_VISION_MODEL, geminiImageType } from "../lib/models";
 
 export const styleDnaSchema = z.object({
   summary: z.string(),
@@ -57,18 +58,17 @@ export async function extractStyleDna(imageUrls: string[]): Promise<StyleDnaResu
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: GEMINI_VISION_MODEL });
 
     const imageParts = await Promise.all(
       imageUrls.slice(0, 10).map(async (url) => {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Failed to fetch ${url}`);
-        const contentType = res.headers.get("content-type") ?? "image/jpeg";
         const buffer = await res.arrayBuffer();
         return {
           inlineData: {
             data: Buffer.from(buffer).toString("base64"),
-            mimeType: contentType as "image/jpeg" | "image/png" | "image/webp",
+            mimeType: geminiImageType(res.headers.get("content-type")),
           },
         };
       }),
@@ -80,7 +80,8 @@ export async function extractStyleDna(imageUrls: string[]): Promise<StyleDnaResu
     const parsed = JSON.parse(cleaned) as unknown;
     return styleDnaSchema.parse(parsed);
   } catch (err) {
+    // A placeholder profile would be saved as the user's real DNA; fail loudly instead.
     console.error("[extractStyleDna] failed:", err);
-    return FALLBACK;
+    throw new Error("Could not read these references. Try again.");
   }
 }

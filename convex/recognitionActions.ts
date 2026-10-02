@@ -17,7 +17,7 @@ export const processJob = internalAction({
       currentStep: "Analyzing image",
     });
 
-    const job = await ctx.runMutation(internal.recognition.getJobInternal, { jobId });
+    const job = await ctx.runQuery(internal.recognition.getJobInternal, { jobId });
     if (!job) return null;
 
     const imageUrl = await ctx.storage.getUrl(job.storageId);

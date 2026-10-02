@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import "react-native-reanimated";
 
 import { ConvexClerkProvider } from "@/components/ConvexClerkProvider";
+import { useStackScreenOptions } from "@/components/useStackScreenOptions";
 
 export { ErrorBoundary } from "expo-router";
 
@@ -38,11 +39,18 @@ export default function RootLayout() {
 
   return (
     <ConvexClerkProvider>
-      <Stack>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding/style-dna" options={{ title: "Style DNA", presentation: "modal" }} />
-      </Stack>
+      <RootStack />
     </ConvexClerkProvider>
+  );
+}
+
+function RootStack() {
+  const screenOptions = useStackScreenOptions();
+  return (
+    <Stack screenOptions={screenOptions}>
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding/style-dna" options={{ title: "Style DNA", presentation: "modal" }} />
+    </Stack>
   );
 }

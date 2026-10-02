@@ -1,118 +1,112 @@
+import { useClerk } from "@clerk/clerk-expo";
 import { useQuery } from "convex/react";
 import { Link } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { api } from "@/convex/_generated/api";
-import Colors from "@/constants/Colors";
-import { useColorScheme } from "@/components/useColorScheme";
+import { Swatch } from "@/components/Swatch";
+import { Body, Button, ErrorText, Kicker, Screen, Title, space, useTheme } from "@/components/ui";
+import { Fonts } from "@/constants/Fonts";
 
 export default function HomeScreen() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme];
+  const colors = useTheme();
+  const { signOut } = useClerk();
   const user = useQuery(api.users.getMe);
   const items = useQuery(api.wardrobe.list, {});
   const profile = useQuery(api.styleProfile.get);
-  const outfits = useQuery(api.outfits.list);
+  const dnaJob = useQuery(api.styleProfile.latestJob);
+  const looks = useQuery(api.outfits.listLooks, { limit: 50 });
 
-  const itemCount = items?.length ?? 0;
-  const outfitCount = outfits?.length ?? 0;
+  const firstName = user?.name?.split(" ")[0];
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
-      <Text style={[styles.greeting, { color: colors.text }]}>
-        {user?.name ? `Hey, ${user.name.split(" ")[0]}` : "Welcome"}
-      </Text>
-      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-        Your personal AI stylist
-      </Text>
+    <Screen headerless>
+      <Kicker>{firstName ? `For ${firstName}` : "Your closet"}</Kicker>
+      <Title size="md">Dressed from what you own.</Title>
 
-      <View style={styles.stats}>
-        <View style={[styles.statCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
-          <Text style={[styles.statNumber, { color: colors.tint }]}>{itemCount}</Text>
-          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Items</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
-          <Text style={[styles.statNumber, { color: colors.tint }]}>{outfitCount}</Text>
-          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Outfits</Text>
-        </View>
+      <View style={[styles.stats, { borderColor: colors.border }]}>
+        <Stat value={items?.length} label="Pieces" />
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        <Stat value={looks?.length} label="Looks" />
       </View>
 
-      {profile ? (
-        <View style={[styles.card, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Your Style DNA</Text>
-          <Text style={[styles.cardBody, { color: colors.textSecondary }]}>{profile.summary}</Text>
-          <View style={styles.tags}>
-            {profile.aesthetics.slice(0, 4).map((tag) => (
-              <View key={tag} style={[styles.tag, { backgroundColor: colors.backgroundTertiary }]}>
-                <Text style={[styles.tagText, { color: colors.text }]}>{tag}</Text>
-              </View>
-            ))}
+      <View style={[styles.section, { borderTopColor: colors.border }]}>
+        <Kicker>Style DNA</Kicker>
+        {dnaJob?.status === "running" ? (
+          <View style={styles.inline} accessibilityLiveRegion="polite">
+            <ActivityIndicator color={colors.textMuted} />
+            <Body>Reading your references. This takes about a minute.</Body>
           </View>
-        </View>
-      ) : (
-        <Link href="/onboarding/style-dna" asChild>
-          <Pressable style={[styles.card, { backgroundColor: colors.tint }]}>
-            <Text style={[styles.cardTitleLight, { color: colors.onTint }]}>Discover Your Style DNA</Text>
-            <Text style={[styles.cardBodyLight, { color: colors.onTint }]}>Upload inspiration photos to build your profile</Text>
-          </Pressable>
-        </Link>
-      )}
+        ) : dnaJob?.status === "failed" && !profile ? (
+          <>
+            <ErrorText>{dnaJob.error ?? "Could not read those references."}</ErrorText>
+            <Link href="/onboarding/style-dna" asChild>
+              <Button label="Try again" variant="outline" />
+            </Link>
+          </>
+        ) : profile ? (
+          <>
+            <Text style={[styles.summary, { color: colors.text }]}>{profile.summary}</Text>
+            <Body>{profile.aesthetics.slice(0, 4).join(" · ")}</Body>
+            <View style={styles.palette}>
+              {profile.palette.map((color, i) => (
+                <Swatch key={`${color}-${i}`} color={color} size={22} />
+              ))}
+            </View>
+            {dnaJob?.status === "failed" ? (
+              <ErrorText>The last update failed: {dnaJob.error ?? "try again"}</ErrorText>
+            ) : null}
+            <Link href="/onboarding/style-dna" asChild>
+              <Button label="Update references" variant="ghost" style={styles.alignStart} />
+            </Link>
+          </>
+        ) : profile === null ? (
+          <>
+            <Body>Three or more photos of clothes you love. The stylist reads your eye from them.</Body>
+            <Link href="/onboarding/style-dna" asChild>
+              <Button label="Build your Style DNA" />
+            </Link>
+          </>
+        ) : null}
+      </View>
 
-      <View style={styles.actions}>
+      <View style={[styles.section, { borderTopColor: colors.border }]}>
         <Link href="/closet/add" asChild>
-          <Pressable style={[styles.actionButton, { backgroundColor: colors.tint }]}>
-            <Text style={[styles.actionButtonText, { color: colors.onTint }]}>Add to Closet</Text>
-          </Pressable>
+          <Button label="Add a garment" />
         </Link>
         <Link href="/style-me" asChild>
-          <Pressable style={[styles.actionButtonOutline, { borderColor: colors.border }]}>
-            <Text style={[styles.actionButtonOutlineText, { color: colors.text }]}>Style Me</Text>
-          </Pressable>
+          <Button label="Compose a look" variant="outline" />
         </Link>
       </View>
-    </ScrollView>
+
+      <Button label="Sign out" variant="ghost" onPress={() => void signOut()} style={styles.signOut} />
+    </Screen>
+  );
+}
+
+function Stat({ value, label }: { value: number | undefined; label: string }) {
+  const colors = useTheme();
+  return (
+    <View style={styles.stat} accessible accessibilityLabel={`${value ?? 0} ${label}`}>
+      <Text style={[styles.statValue, { color: colors.text }]}>{value ?? "–"}</Text>
+      <Kicker>{label}</Kicker>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 20, gap: 20 },
-  greeting: { fontSize: 28, fontWeight: "700" },
-  subtitle: { fontSize: 16, marginTop: -12 },
-  stats: { flexDirection: "row", gap: 12 },
-  statCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
+  stats: {
+    flexDirection: "row",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginTop: space.md,
   },
-  statNumber: { fontSize: 28, fontWeight: "700" },
-  statLabel: { fontSize: 14, marginTop: 4 },
-  card: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 8,
-  },
-  cardTitle: { fontSize: 18, fontWeight: "600" },
-  cardBody: { fontSize: 14, lineHeight: 20 },
-  cardTitleLight: { fontSize: 18, fontWeight: "600" },
-  cardBodyLight: { fontSize: 14, lineHeight: 20 },
-  tags: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
-  tag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  tagText: { fontSize: 12, fontWeight: "500" },
-  actions: { gap: 12 },
-  actionButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  actionButtonText: { fontSize: 16, fontWeight: "600" },
-  actionButtonOutline: {
-    paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
-  },
-  actionButtonOutlineText: { fontSize: 16, fontWeight: "500" },
+  stat: { flex: 1, paddingVertical: space.lg, gap: 2 },
+  statValue: { fontFamily: Fonts.serif, fontSize: 40, lineHeight: 44 },
+  divider: { width: StyleSheet.hairlineWidth, marginRight: space.xl },
+  section: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: space.xl, gap: space.md, marginTop: space.md },
+  inline: { flexDirection: "row", alignItems: "center", gap: space.md },
+  summary: { fontFamily: Fonts.serifItalic, fontSize: 22, lineHeight: 30 },
+  palette: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  alignStart: { alignSelf: "flex-start", paddingHorizontal: 0 },
+  signOut: { alignSelf: "center", marginTop: space.xl },
 });

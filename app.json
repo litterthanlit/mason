@@ -47,15 +47,10 @@
       ],
       "expo-image",
       [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow Fashion Agent to photograph your clothes for your digital closet."
-        }
-      ],
-      [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Fashion Agent to access photos for your closet and style profile."
+          "photosPermission": "Allow Style Me to use photos for your closet and style profile.",
+          "cameraPermission": "Allow Style Me to photograph your clothes for your digital closet."
         }
       ]
     ],

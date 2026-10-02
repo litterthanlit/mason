@@ -17,7 +17,8 @@ Photoreal avatar / virtual try-on is **not shipped**. Direction, cost model, and
 - Convex (database, file storage, real-time sync, AI actions)
 - Clerk (auth)
 - Gemini Flash (garment recognition + style DNA)
-- Claude via `@convex-dev/agent` (styling agent)
+- Claude Sonnet 5 via `@convex-dev/agent` (styling agent; model ids in `convex/lib/models.ts`)
+- `@convex-dev/rate-limiter` (per-user limits on uploads and AI calls)
 
 ## Setup
 
@@ -39,6 +40,12 @@ In Convex dashboard, also set:
 
 - `GEMINI_API_KEY`
 - `ANTHROPIC_API_KEY`
+- `GEMINI_MODEL` (optional) — override the Gemini Flash model id without a deploy
+
+### Clerk
+
+- Create a **JWT template named `convex`** in the Clerk dashboard (Convex reads it via `auth.config.ts`).
+- Enable **email + password** with **email verification code**. Sign-up asks for the code in-app.
 
 ### 3. Start Convex
 
@@ -54,13 +61,27 @@ npm start
 
 Press `i` for iOS simulator or scan QR code on device.
 
+## Checks
+
+```bash
+npm run lint              # ESLint (eslint-config-expo)
+npm run typecheck         # app
+npm run typecheck:convex  # Convex functions
+npm test                  # convex-test: auth, ownership, rate limits
+```
+
+CI runs all four on every pull request.
+
 ## Project structure
 
 ```
-app/           Expo Router screens
-components/    Shared UI components
-convex/        Backend (schema, wardrobe, recognition, agent)
-lib/           Client utilities
+app/            Expo Router screens
+components/ui/  Design system: Title, Kicker, Body, Button, Chip, Field, Screen
+components/     Feature components (GarmentForm, LookCard, ItemCard, Swatch)
+convex/         Backend (schema, wardrobe, recognition, stylist agent, crons)
+convex/lib/     Auth, ownership (threads, uploads), rate limits, models, prompts
+lib/            Client utilities (uploads, error messages, color names)
+docs/           AUDIT.md (findings and status), TRY-ON.md (direction)
 ```
 
 ## EAS Build

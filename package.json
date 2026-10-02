@@ -3,18 +3,19 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.111.0",
+    "@ai-sdk/anthropic": "^3.0.96",
+    "@ai-sdk/provider-utils": "^4.0.38",
     "@clerk/clerk-expo": "^2.19.31",
     "@convex-dev/agent": "^0.6.4",
+    "@convex-dev/rate-limiter": "^0.4.0",
     "@google/generative-ai": "^0.24.1",
+    "ai": "^6.0.224",
     "convex": "^1.42.1",
     "convex-helpers": "^0.1.120",
     "expo": "~57.0.4",
-    "expo-camera": "^57.0.1",
     "expo-constants": "~57.0.3",
     "expo-file-system": "^57.0.0",
     "expo-font": "~57.0.0",
-    "expo-haptics": "^57.0.0",
     "expo-image": "~57.0.0",
     "expo-image-manipulator": "^57.0.2",
     "expo-image-picker": "^57.0.2",
@@ -36,19 +37,24 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "^3.0.96",
-    "@ai-sdk/provider-utils": "^4.0.38",
+    "@edge-runtime/vm": "^5.0.0",
     "@types/node": "^26.1.1",
     "@types/react": "~19.2.2",
-    "ai": "^6.0.224",
-    "typescript": "~6.0.3"
+    "convex-test": "^0.0.60",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "^57.0.2",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:convex": "tsc --noEmit -p convex",
+    "test": "vitest run",
+    "lint": "eslint ."
   },
   "private": true
 }
