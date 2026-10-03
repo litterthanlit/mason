@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
+import { displayUrl } from "./lib/images";
 
 export const getUserByToken = internalQuery({
   args: { tokenIdentifier: v.string() },
@@ -189,7 +190,7 @@ export const hydratePiecesInternal = internalQuery({
       result.push({
         itemId: item._id,
         name: item.name,
-        imageUrl: item.imageUrl,
+        imageUrl: await displayUrl(ctx, item),
         category: item.category,
       });
     }

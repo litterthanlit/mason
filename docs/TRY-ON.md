@@ -1,6 +1,6 @@
 # Personal Stylist Avatar & Try-On — Master Note
 
-Status: **direction, not shipped.** The app today is a closet + Style DNA + stylist. Face scan, photoreal wearing, and paste-a-link try-on are **not** user-facing yet. Do not treat this document as a completed feature.
+Status: **v1 shipped (October 2026): studio mockups + fitting room.** Every saved garment gets a catalogue packshot, and the Fitting tab dresses a photo of you in closet pieces. Wishlist items, paste-a-link and a persistent 3D/identity model are still direction only. See "What v1 shipped" below.
 
 Captured: September 2026.
 
@@ -184,14 +184,23 @@ Already in the repo (user-facing):
 - Occasion outfits from **owned** pieces only
 - Conversational stylist grounded in wardrobe + DNA (`convex/lib/styleCanon.ts`)
 
+Shipped in v1 (October 2026):
+
+- **Studio mockups.** Saving a garment queues a packshot from the user's own photo (`convex/mockups.ts`, `mockupActions.ts`): ghost mannequin for tops, outerwear and dresses; flat for bottoms; product angle for shoes and bags; one warm off-white backdrop everywhere. Model: `gemini-3.1-flash-lite-image` (~$0.034/image), once per garment. The prompt forbids redesigning the piece, and the item page keeps a Studio / Your photo toggle so the original is always one tap away.
+- **Fitting room** (Fitting tab, `convex/fitting.ts`, `fittingActions.ts`):
+  - Capture: up to 3 full-length photos (`likenessPhotos`), owner-only. Removing a photo deletes every render made from it.
+  - Pick pieces on a rail, one per slot (a dress swaps out top and bottom; accessories stack, max 6). Looks and item pages deep-link in with `?items=`.
+  - Render: photo + garment references (the packshot when ready) → one 3:4 still on the same backdrop. Model: `gemini-3.1-flash-image` (~$0.067 at 1K).
+  - Metering: 5 renders burst, 10/day refill per user (`tryOn` bucket). The same photo + pieces returns the existing render, so repeats are free. The room shows what's left.
+  - Copy says "a preview for colour and proportion, not a promise of fit" on every surface.
+- Override either model in Convex env without a deploy: `GEMINI_MOCKUP_MODEL`, `GEMINI_TRY_ON_MODEL`.
+
 Not built:
 
-- Body/face capture pack
-- Persistent visual identity
+- Persistent visual identity beyond the reference photo (embeddings, body model)
 - Wishlist items (today the stylist must not invent pieces)
 - Product URL ingest
-- Any try-on or photoreal wearing path
-- Credits / metered renders
+- HD / paid tier, purchase-grade VTON pass
 
 If try-on ships, wishlist items become first-class wardrobe objects (owned vs wanted). The stylist can then compose across both, and the render is how you see the gap.
 

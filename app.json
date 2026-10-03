@@ -49,8 +49,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Style Me to use photos for your closet and style profile.",
-          "cameraPermission": "Allow Style Me to photograph your clothes for your digital closet."
+          "photosPermission": "Allow Style Me to use photos for your closet, style profile and fitting room.",
+          "cameraPermission": "Allow Style Me to photograph your clothes, and you for the fitting room."
         }
       ]
     ],

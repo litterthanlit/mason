@@ -6,6 +6,11 @@ export const stylistModel = anthropic("claude-sonnet-5");
 // Override in the Convex dashboard to move to a newer Flash model without a deploy.
 export const GEMINI_VISION_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
 
+// Image models (Gemini "Nano Banana" family). Mockups are single-garment edits,
+// so the cheapest model is enough; try-on needs identity reference support.
+export const GEMINI_MOCKUP_MODEL = process.env.GEMINI_MOCKUP_MODEL ?? "gemini-3.1-flash-lite-image";
+export const GEMINI_TRY_ON_MODEL = process.env.GEMINI_TRY_ON_MODEL ?? "gemini-3.1-flash-image";
+
 const GEMINI_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 
 /** The app always uploads JPEGs; trust the header only when Gemini accepts it. */

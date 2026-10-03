@@ -10,10 +10,12 @@ type Props = {
   imageUrl: string;
   category: GarmentCategory;
   colors: string[];
+  /** Small status over the image, e.g. while the studio mockup renders. */
+  status?: string;
   onPress?: () => void;
 };
 
-export function ItemCard({ name, imageUrl, category, colors: itemColors, onPress }: Props) {
+export function ItemCard({ name, imageUrl, category, colors: itemColors, status, onPress }: Props) {
   const theme = useTheme();
 
   return (
@@ -21,7 +23,7 @@ export function ItemCard({ name, imageUrl, category, colors: itemColors, onPress
       style={({ pressed }) => [styles.card, { opacity: pressed ? 0.85 : 1 }]}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${name}, ${CATEGORY_LABELS[category]}`}
+      accessibilityLabel={`${name}, ${CATEGORY_LABELS[category]}${status ? `, ${status}` : ""}`}
     >
       <Image
         source={{ uri: imageUrl }}
@@ -30,6 +32,11 @@ export function ItemCard({ name, imageUrl, category, colors: itemColors, onPress
         transition={150}
         recyclingKey={imageUrl}
       />
+      {status ? (
+        <View style={[styles.status, { backgroundColor: theme.background }]}>
+          <Text style={[styles.statusText, { color: theme.textSecondary }]}>{status}</Text>
+        </View>
+      ) : null}
       <View style={styles.content}>
         <Text style={[styles.category, { color: theme.textMuted }]}>{CATEGORY_LABELS[category]}</Text>
         <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
@@ -49,6 +56,8 @@ const styles = StyleSheet.create({
   card: { flex: 1, maxWidth: "50%" },
   image: { width: "100%", aspectRatio: 3 / 4 },
   content: { paddingTop: space.sm, gap: 3 },
+  status: { position: "absolute", top: space.sm, left: space.sm, paddingHorizontal: 6, paddingVertical: 3 },
+  statusText: { fontFamily: Fonts.sans, fontSize: 9, letterSpacing: 1.4, textTransform: "uppercase" },
   category: { fontFamily: Fonts.sans, fontSize: 10, letterSpacing: 1.6, textTransform: "uppercase" },
   name: { fontFamily: Fonts.sans, fontSize: 14 },
   swatches: { flexDirection: "row", gap: 4, marginTop: 4 },

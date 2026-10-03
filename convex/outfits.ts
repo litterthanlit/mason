@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
+import { displayUrl } from "./lib/images";
 
 const outfitValidator = v.object({
   _id: v.id("outfits"),
@@ -59,7 +60,12 @@ export const listLooks = authedQuery({
       for (const itemId of outfit.itemIds) {
         const item = await ctx.db.get("wardrobeItems", itemId);
         if (item) {
-          pieces.push({ itemId: item._id, name: item.name, imageUrl: item.imageUrl, category: item.category });
+          pieces.push({
+            itemId: item._id,
+            name: item.name,
+            imageUrl: await displayUrl(ctx, item),
+            category: item.category,
+          });
         }
       }
       if (pieces.length === 0) continue;

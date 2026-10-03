@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { rateLimiter } from "./lib/rateLimits";
+import { requestMockup } from "./lib/images";
 import { claimUpload, releaseUpload } from "./lib/uploads";
 import { garmentAttributes, garmentCategory, jobStatus, recognitionType } from "./lib/validators";
 
@@ -132,6 +133,7 @@ export const confirmGarment = authedMutation({
       wardrobeItemId: itemId,
       updatedAt: now,
     });
+    await requestMockup(ctx, ctx.user._id, itemId, { throws: false });
 
     return itemId;
   },
