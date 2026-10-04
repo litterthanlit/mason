@@ -34,6 +34,11 @@ export default defineSchema({
     brand: v.optional(v.string()),
     aiConfidence: v.optional(v.number()),
     notes: v.optional(v.string()),
+    // Studio packshot made from the photo after save (see mockups.ts).
+    // Unset means none was requested yet; the original photo stands in.
+    mockupStatus: v.optional(jobStatus),
+    mockupStorageId: v.optional(v.id("_storage")),
+    mockupError: v.optional(v.string()),
     createdAt: timestamp,
     updatedAt: timestamp,
   })
@@ -104,6 +109,30 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_and_occasion", ["userId", "occasion"]),
+
+  // Full-length photos of the user that the fitting room dresses. Owner-only.
+  likenessPhotos: defineTable({
+    userId: v.id("users"),
+    storageId: v.id("_storage"),
+    createdAt: timestamp,
+  }).index("by_user", ["userId"]),
+
+  // One render of a likeness wearing a set of closet pieces. `key` is the
+  // likeness plus the sorted item ids, so the same outfit is never paid for twice.
+  tryOns: defineTable({
+    userId: v.id("users"),
+    likenessId: v.id("likenessPhotos"),
+    itemIds: v.array(v.id("wardrobeItems")),
+    key: v.string(),
+    status: jobStatus,
+    storageId: v.optional(v.id("_storage")),
+    error: v.optional(v.string()),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_key", ["userId", "key"])
+    .index("by_likeness", ["likenessId"]),
 
   stylingSessions: defineTable({
     userId: v.id("users"),

@@ -58,9 +58,10 @@ export default function ClosetScreen() {
           renderItem={({ item }) => (
             <ItemCard
               name={item.name}
-              imageUrl={item.imageUrl}
+              imageUrl={item.mockupUrl ?? item.imageUrl}
               category={item.category}
               colors={item.colors}
+              status={item.mockupStatus === "queued" || item.mockupStatus === "running" ? "Studio shot…" : undefined}
               onPress={() => router.push(`/closet/${item._id}`)}
             />
           )}

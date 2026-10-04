@@ -76,6 +76,9 @@ export default function HomeScreen() {
         <Link href="/style-me" asChild>
           <Button label="Compose a look" variant="outline" />
         </Link>
+        <Link href="/fitting" asChild>
+          <Button label="Open the fitting room" variant="outline" />
+        </Link>
       </View>
 
       <Button label="Sign out" variant="ghost" onPress={() => void signOut()} style={styles.signOut} />

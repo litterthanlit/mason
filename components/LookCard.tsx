@@ -41,16 +41,23 @@ export function LookCard({ look, onRemove }: Props) {
             {look.name}
           </Text>
         </View>
-        {onRemove ? (
-          <Pressable
-            onPress={onRemove}
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel={`Remove look ${look.name}`}
-          >
-            <Text style={[styles.remove, { color: colors.textMuted }]}>Remove</Text>
-          </Pressable>
-        ) : null}
+        <View style={styles.actions}>
+          <Link href={{ pathname: "/fitting", params: { items: look.pieces.map((p) => p.itemId).join(",") } }} asChild>
+            <Pressable hitSlop={12} accessibilityRole="link" accessibilityLabel={`Try on look ${look.name}`}>
+              <Text style={[styles.action, { color: colors.text }]}>Try on</Text>
+            </Pressable>
+          </Link>
+          {onRemove ? (
+            <Pressable
+              onPress={onRemove}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove look ${look.name}`}
+            >
+              <Text style={[styles.action, { color: colors.textMuted }]}>Remove</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
       <View style={styles.strip}>
         {look.pieces.map((piece) => (
@@ -97,7 +104,8 @@ const styles = StyleSheet.create({
     lineHeight: 36,
     letterSpacing: -0.4,
   },
-  remove: {
+  actions: { flexDirection: "row", gap: 20 },
+  action: {
     fontFamily: Fonts.sans,
     fontSize: 11,
     letterSpacing: 1.6,

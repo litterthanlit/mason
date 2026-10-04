@@ -9,10 +9,15 @@
  */
 
 import type * as ai_extractStyleDNA from "../ai/extractStyleDNA.js";
+import type * as ai_generateImage from "../ai/generateImage.js";
+import type * as ai_imagePrompts from "../ai/imagePrompts.js";
 import type * as ai_recognizeGarment from "../ai/recognizeGarment.js";
 import type * as crons from "../crons.js";
+import type * as fitting from "../fitting.js";
+import type * as fittingActions from "../fittingActions.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_customFunctions from "../lib/customFunctions.js";
+import type * as lib_images from "../lib/images.js";
 import type * as lib_looks from "../lib/looks.js";
 import type * as lib_models from "../lib/models.js";
 import type * as lib_rateLimits from "../lib/rateLimits.js";
@@ -21,6 +26,8 @@ import type * as lib_stylistAgent from "../lib/stylistAgent.js";
 import type * as lib_threads from "../lib/threads.js";
 import type * as lib_uploads from "../lib/uploads.js";
 import type * as lib_validators from "../lib/validators.js";
+import type * as mockupActions from "../mockupActions.js";
+import type * as mockups from "../mockups.js";
 import type * as outfits from "../outfits.js";
 import type * as recognition from "../recognition.js";
 import type * as recognitionActions from "../recognitionActions.js";
@@ -40,10 +47,15 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "ai/extractStyleDNA": typeof ai_extractStyleDNA;
+  "ai/generateImage": typeof ai_generateImage;
+  "ai/imagePrompts": typeof ai_imagePrompts;
   "ai/recognizeGarment": typeof ai_recognizeGarment;
   crons: typeof crons;
+  fitting: typeof fitting;
+  fittingActions: typeof fittingActions;
   "lib/auth": typeof lib_auth;
   "lib/customFunctions": typeof lib_customFunctions;
+  "lib/images": typeof lib_images;
   "lib/looks": typeof lib_looks;
   "lib/models": typeof lib_models;
   "lib/rateLimits": typeof lib_rateLimits;
@@ -52,6 +64,8 @@ declare const fullApi: ApiFromModules<{
   "lib/threads": typeof lib_threads;
   "lib/uploads": typeof lib_uploads;
   "lib/validators": typeof lib_validators;
+  mockupActions: typeof mockupActions;
+  mockups: typeof mockups;
   outfits: typeof outfits;
   recognition: typeof recognition;
   recognitionActions: typeof recognitionActions;

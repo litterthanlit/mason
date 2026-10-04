@@ -60,6 +60,20 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="fitting"
+          options={{
+            title: "Fitting",
+            headerShown: false,
+            tabBarIcon: ({ color }) => (
+              <SymbolView
+                name={{ ios: "figure.stand", android: "accessibility_new", web: "accessibility_new" }}
+                tintColor={color}
+                size={24}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="style-me"
           options={{
             title: "Looks",

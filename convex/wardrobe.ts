@@ -1,7 +1,10 @@
 import { ConvexError, v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
+import { mockupUrl, requestMockup } from "./lib/images";
 import { claimUpload, releaseUpload } from "./lib/uploads";
-import { garmentCategory } from "./lib/validators";
+import { garmentCategory, jobStatus } from "./lib/validators";
 
 const wardrobeItemValidator = v.object({
   _id: v.id("wardrobeItems"),
@@ -21,9 +24,18 @@ const wardrobeItemValidator = v.object({
   brand: v.optional(v.string()),
   aiConfidence: v.optional(v.number()),
   notes: v.optional(v.string()),
+  mockupStatus: v.optional(jobStatus),
+  mockupStorageId: v.optional(v.id("_storage")),
+  mockupError: v.optional(v.string()),
+  /** The studio mockup, once rendered. Show this over `imageUrl` when set. */
+  mockupUrl: v.union(v.string(), v.null()),
   createdAt: v.number(),
   updatedAt: v.number(),
 });
+
+async function withMockup(ctx: QueryCtx, item: Doc<"wardrobeItems">) {
+  return { ...item, mockupUrl: await mockupUrl(ctx, item) };
+}
 
 export const list = authedQuery({
   args: {
@@ -37,13 +49,14 @@ export const list = authedQuery({
       .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
       .collect();
 
-    return items
+    const matching = items
       .filter((item) => {
         if (args.category && item.category !== args.category) return false;
         if (args.season && !item.season.includes(args.season)) return false;
         return true;
       })
       .sort((a, b) => b.createdAt - a.createdAt);
+    return await Promise.all(matching.map((item) => withMockup(ctx, item)));
   },
 });
 
@@ -53,7 +66,7 @@ export const get = authedQuery({
   handler: async (ctx, { itemId }) => {
     const item = await ctx.db.get("wardrobeItems", itemId);
     if (!item || item.userId !== ctx.user._id) return null;
-    return item;
+    return await withMockup(ctx, item);
   },
 });
 
@@ -80,7 +93,7 @@ export const create = authedMutation({
     if (!imageUrl) throw new ConvexError("Image not found");
 
     const now = Date.now();
-    return await ctx.db.insert("wardrobeItems", {
+    const itemId = await ctx.db.insert("wardrobeItems", {
       userId: ctx.user._id,
       storageId: args.storageId,
       imageUrl,
@@ -99,6 +112,8 @@ export const create = authedMutation({
       createdAt: now,
       updatedAt: now,
     });
+    await requestMockup(ctx, ctx.user._id, itemId, { throws: false });
+    return itemId;
   },
 });
 
@@ -160,6 +175,7 @@ export const remove = authedMutation({
 
     await ctx.db.delete("wardrobeItems", itemId);
     await releaseUpload(ctx, item.storageId);
+    if (item.mockupStorageId) await releaseUpload(ctx, item.mockupStorageId);
     return null;
   },
 });

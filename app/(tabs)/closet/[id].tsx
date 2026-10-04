@@ -7,7 +7,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { GarmentForm, type GarmentDraft } from "@/components/GarmentForm";
 import { Swatch } from "@/components/Swatch";
-import { Body, Button, ErrorText, Kicker, Screen, Title, space, useTheme } from "@/components/ui";
+import { Body, Button, Chip, ErrorText, Kicker, Screen, Title, space, useTheme } from "@/components/ui";
 import { describeError } from "@/lib/errors";
 import { CATEGORY_LABELS } from "@/lib/types";
 
@@ -19,8 +19,10 @@ export default function ItemDetailScreen() {
   const item = useQuery(api.wardrobe.get, { itemId: id as Id<"wardrobeItems"> });
   const updateItem = useMutation(api.wardrobe.update);
   const removeItem = useMutation(api.wardrobe.remove);
+  const requestMockup = useMutation(api.mockups.request);
 
   const [draft, setDraft] = useState<GarmentDraft | null>(null);
+  const [view, setView] = useState<"studio" | "photo">("studio");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -41,6 +43,17 @@ export default function ItemDetailScreen() {
   }
 
   const wardrobeItem = item;
+  const rendering = item.mockupStatus === "queued" || item.mockupStatus === "running";
+  const showStudio = view === "studio" && !!item.mockupUrl;
+
+  async function handleMockup() {
+    setError("");
+    try {
+      await requestMockup({ itemId: wardrobeItem._id });
+    } catch (err) {
+      setError(describeError(err, "Could not start the studio shot."));
+    }
+  }
 
   function startEditing() {
     setError("");
@@ -93,13 +106,35 @@ export default function ItemDetailScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: draft ? "Edit" : "" }} />
-      <Image
-        source={{ uri: wardrobeItem.imageUrl }}
-        style={styles.image}
-        contentFit="cover"
-        transition={150}
-        accessibilityLabel={wardrobeItem.name}
-      />
+      <View>
+        <Image
+          source={{ uri: showStudio ? item.mockupUrl! : wardrobeItem.imageUrl }}
+          style={[styles.image, { backgroundColor: colors.backgroundSecondary }]}
+          contentFit="cover"
+          transition={200}
+          accessibilityLabel={`${wardrobeItem.name}, ${showStudio ? "studio shot" : "your photo"}`}
+        />
+        {rendering ? (
+          <View style={[styles.rendering, { backgroundColor: colors.background }]} accessibilityLiveRegion="polite">
+            <ActivityIndicator size="small" color={colors.textMuted} />
+            <Kicker>Making the studio shot</Kicker>
+          </View>
+        ) : null}
+      </View>
+
+      {item.mockupUrl ? (
+        <View style={styles.views} accessibilityRole="radiogroup" accessibilityLabel="Image">
+          <Chip label="Studio" selected={showStudio} onPress={() => setView("studio")} />
+          <Chip label="Your photo" selected={!showStudio} onPress={() => setView("photo")} />
+        </View>
+      ) : item.mockupStatus === "failed" ? (
+        <View style={styles.mockupRow}>
+          <ErrorText style={styles.flex}>{item.mockupError ?? "The studio shot failed."}</ErrorText>
+          <Button label="Retry" variant="ghost" onPress={handleMockup} />
+        </View>
+      ) : !rendering ? (
+        <Button label="Make a studio shot" variant="ghost" onPress={handleMockup} style={styles.alignStart} />
+      ) : null}
 
       {draft ? (
         <>
@@ -132,6 +167,10 @@ export default function ItemDetailScreen() {
           </View>
 
           {error ? <ErrorText>{error}</ErrorText> : null}
+          <Button
+            label="Try it on"
+            onPress={() => router.push({ pathname: "/fitting", params: { items: wardrobeItem._id } })}
+          />
           <Button label="Edit" variant="outline" onPress={startEditing} />
           <Button label="Delete" variant="danger" onPress={handleDelete} />
         </>
@@ -155,6 +194,20 @@ function Spec({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xl },
   image: { width: "100%", aspectRatio: 3 / 4 },
+  rendering: {
+    position: "absolute",
+    left: space.md,
+    bottom: space.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+  },
+  views: { flexDirection: "row", columnGap: space.lg, marginTop: -space.sm },
+  mockupRow: { flexDirection: "row", alignItems: "center", gap: space.md },
+  flex: { flex: 1 },
+  alignStart: { alignSelf: "flex-start", paddingHorizontal: 0, marginTop: -space.sm },
   heading: { gap: space.xs },
   swatches: { flexDirection: "row", gap: space.sm },
   specs: { borderTopWidth: StyleSheet.hairlineWidth },
